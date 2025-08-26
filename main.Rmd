@@ -1,0 +1,100 @@
+---
+title: "main"
+output: html_document
+date: "2025-08-26"
+---
+
+
+```{r}
+student_preferences_round_1_path <- "data/BA_01_Preferences_Students.txt"
+number_topics <- 4
+available_topic_ids <- 1:number_topics
+```
+
+```{r}
+library(tidyverse)
+library(here)
+
+here::i_am("main.rmd")
+
+```
+
+```{r}
+student_preferences_round_1 <- read_csv(
+  file = here(student_preferences_round_1_path)
+  )
+
+student_preferences_round_1_long <- student_preferences_round_1 |>
+  pivot_longer(
+    cols = preference_1:preference_5,
+    names_to = "topic_id",
+    names_prefix = "preference_",
+    values_to = "rank")
+
+
+# ---- Helper: coerce inputs & checks ----
+validate_prefs <- function(preferences, objects) {
+  req_cols <- c("student_id", "topic_id", "rank")
+  if (!all(req_cols %in% names(preferences))) {
+    abort("`preferences` must have columns: student_id, topic_id, rank (rank 1 = most preferred).")
+  }
+  preferences %>%
+    mutate(
+      student_id = as.character(student_id),
+      topic_id = as.character(topic_id),
+      rank = as.integer(rank)
+    ) %>%
+    filter(topic_id %in% objects) %>%
+    arrange(student_id, rank)
+}
+
+
+allocate_by_random_serial_dictatorship <- function(preferences, topic_ids, topics_per_student = 1, seed = NULL) {
+  if (!is.null(seed)) set.seed(seed)
+
+  prefs <- validate_prefs(preferences, topic_ids)
+  student_ids <- unique(prefs$student_id)
+
+  for i in seq_len(topics_per_student) {
+    
+  }
+  order_vec <- sample(student_ids, length(student_ids)) 
+
+  available <- topic_ids
+  picks <- vector("character", length(student_ids))
+  names(picks) <- student_ids
+
+  # Build a fast lookup of each student_id's ordered list
+  student_id_lists <- prefs %>%
+    arrange(student_id, rank) %>%
+    group_by(student_id) %>%
+    summarise(pref_list = list(topic_id), .groups = "drop") %>%
+    deframe()
+
+  # Serial dictatorship
+  for (a in order_vec) {
+    # highest-ranked available topic_id for student_id a
+    choice <- keep(student_id_lists[[a]], ~ .x %in% available) %>% pluck(1, .default = NA_character_)
+    if (!is.na(choice)) {
+      picks[a] <- choice
+      # remove chosen topic_id from availability
+      available <- setdiff(available, choice)
+    } else {
+      picks[a] <- NA_character_
+    }
+    if (length(available) == 0L) break
+  }
+
+  tibble(student_id = names(picks), topic_id = unname(picks)) %>%
+    arrange(student_id)
+}
+
+allocation_round_1 <- allocate_by_random_serial_dictatorship(
+  preferences = student_preferences_round_1_long,
+  topic_ids = available_topic_ids,
+  seed = 20250826
+)
+  
+
+```
+
