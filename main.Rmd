@@ -6,7 +6,7 @@ date: "2025-08-26"
 
 
 ```{r}
-student_preferences_round_1_path <- "data/BA_01_Preferences_Students.csv"
+student_preferences_round_1_path <- "data/BA_01_Preferences_Students.txt"
 n_topics <- 4
 available_topic_ids <- 1:n_topics
 n_topics_per_student <- 2
@@ -61,18 +61,18 @@ topics_filler <- unlist(replicate(n_topics_per_student, sample(available_topic_i
 # Step 1 - Create Topic Pools
 
 create_topic_pool <- function(round) {
-    multiplier <- ceiling(n_students / n_topics)
+    multiplier <- n_students / n_topics
     
     if(multiplier < 1) {
       message("The case that there are more topics than students is not yet supported.")
     } else if(multiplier == 1) {
       tf <- NULL
     } else {
-    n_filler <- (n_topics * multiplier) %% n_students
+    n_filler <- (n_topics * ceiling(multiplier)) %% n_students
     beginning <- ((round - 1) * n_filler) + 1
     tf <- topics_filler[beginning:(beginning + n_filler - 1)]
     }
-    topic_pool <- c(rep(available_topic_ids, multiplier), tf)
+    topic_pool <- c(rep(available_topic_ids, (ceiling(multiplier)-1)), tf)
   
   # sanity check
   if(length(topic_pool) != n_students) {
