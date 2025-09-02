@@ -25,40 +25,57 @@ student_preferences_round_1 <- read_csv(
   file = here(student_preferences_round_1_path)
   )
 
-n_students <- nrow(student_preferences_round_1)
+set.seed(123)  # reproducible random fills
 
+pref_cols <- paste0("preference_", seq_len(n_topics))
 
-student_preferences_round_1_long <- student_preferences_round_1 |>
+student_preferences_round_1_fixed <- student_preferences_round_1 %>%
+  rowwise() %>%
+  mutate(
+    # 1) pull row prefs as a list-column (this line fixes your error)
+    prefs = list(c_across(all_of(pref_cols))),
+
+    # 2) keep only valid topic IDs
+    prefs = list(prefs[[1]][prefs[[1]] %in% available_topic_ids]),
+
+    # 3) drop duplicates, keep first
+    prefs = list(unique(prefs[[1]])),
+
+    # 4) fill with remaining topics (no replacement) to reach n_topics
+    prefs = list({
+      remaining <- setdiff(available_topic_ids, prefs[[1]])
+      c(prefs[[1]], sample(remaining, n_topics - length(prefs[[1]]), replace = FALSE))
+    })
+  ) %>%
+  ungroup() %>%
+  # write back into the wide columns
+  mutate(
+    across(all_of(pref_cols),
+      ~ map2_int(prefs, str_extract(cur_column(), "\\d+"),
+                 \(vec, pos) vec[as.integer(pos)])
+    )
+  ) %>%
+  select(-prefs)
+
+# pivot longer
+student_preferences_round_1_long <- student_preferences_round_1_fixed %>%
   pivot_longer(
     cols = tidyselect::all_of(paste0("preference_", seq_len(n_topics))),
-    names_to = "topic_id",
+    names_to = "rank",
     names_prefix = "preference_",
-    values_to = "rank")
+    values_to = "topic_id"
+  )
+
+n_students <- nrow(student_preferences_round_1_fixed)
+```
 
 
-# ---- Helper: coerce inputs & checks ----
-validate_prefs <- function(preferences, objects) {
-  req_cols <- c("student_id", "topic_id", "rank")
-  if (!all(req_cols %in% names(preferences))) {
-    abort("`preferences` must have columns: student_id, topic_id, rank (rank 1 = most preferred).")
-  }
-  preferences %>%
-    mutate(
-      student_id = as.character(student_id),
-      topic_id = as.character(topic_id),
-      rank = as.integer(rank)
-    ) %>%
-    filter(topic_id %in% objects) %>%
-    arrange(student_id, rank)
-}
+```{r}
+# Step 1 - Create Topic Pools
 
-# Preparations
 ## Create long randomized list of topic ids to use as filler.
 topics_filler <- unlist(replicate(n_topics_per_student, sample(available_topic_ids), simplify = FALSE))
 
-
-
-# Step 1 - Create Topic Pools
 
 create_topic_pool <- function(round) {
     multiplier <- n_students / n_topics
@@ -87,92 +104,175 @@ topic_pools <- lapply(1:n_topics_per_student, function(r) create_topic_pool(r))
 
 ```{r}
 # Step 2 - allocate topics by random serial dictatorship
-allocate_by_random_serial_dictatorship <- function(
-  preferences,
-  topic_pools,              # list: one vector of topic_ids per round
-  seed = NULL
-) {
-  if (!is.null(seed)) set.seed(seed)
-
+allocate_by_random_serial_dictatorship <- function(preferences,
+                                                   topic_pools,
+                                                   # list: one vector of topic_ids per round
+                                                   seed = NULL) {
+  if (!is.null(seed))
+    set.seed(seed)
+  
+  # ---- Helper: coerce inputs & checks ----
+  validate_prefs <- function(preferences, objects) {
+    req_cols <- c("student_id", "topic_id", "rank")
+    if (!all(req_cols %in% names(preferences))) {
+      abort(
+        "`preferences` must have columns: student_id, topic_id, rank (rank 1 = most preferred)."
+      )
+    }
+    preferences %>%
+      mutate(
+        student_id = as.character(student_id),
+        topic_id = as.character(topic_id),
+        rank = as.integer(rank)
+      ) %>%
+      filter(topic_id %in% objects) %>%
+      arrange(student_id, rank)
+  }
+  
   # Validate preferences against the union of all topics that can ever appear
   all_topic_ids <- unique(unlist(topic_pools, use.names = FALSE))
   prefs <- validate_prefs(preferences, all_topic_ids)
-
+  
   student_ids <- unique(prefs$student_id)
   n_students  <- length(student_ids)
   n_rounds    <- length(topic_pools)
-
+  
   # 1) Hard-fail if any round's pool size != number of students
   pool_sizes <- vapply(topic_pools, length, integer(1))
   bad_rounds <- which(pool_sizes != n_students)
   if (length(bad_rounds) > 0) {
     stop(
-      "Pool size mismatch: each round must have exactly ", n_students,
+      "Pool size mismatch: each round must have exactly ",
+      n_students,
       " topics (one per student). Offending rounds: ",
-      paste0(sprintf("#%d (size=%d)", bad_rounds, pool_sizes[bad_rounds]), collapse = ", "),
+      paste0(
+        sprintf("#%d (size=%d)", bad_rounds, pool_sizes[bad_rounds]),
+        collapse = ", "
+      ),
       call. = FALSE
     )
   }
-
+  
   # Fast lookup: each student's ordered preference list (best -> worst)
   student_id_lists <- prefs %>%
     dplyr::arrange(student_id, rank) %>%
     dplyr::group_by(student_id) %>%
     dplyr::summarise(pref_list = list(topic_id), .groups = "drop") %>%
     tibble::deframe()
-
+  
   # Output: rows = students, cols = rounds
   assign_mat <- matrix(
-    NA_character_, nrow = n_students, ncol = n_rounds,
+    NA_character_,
+    nrow = n_students,
+    ncol = n_rounds,
     dimnames = list(student_ids, paste0("topic_", seq_len(n_rounds)))
   )
-
+  
   # Track topics already assigned to each student across rounds
   assigned_by_student <- stats::setNames(vector("list", n_students), student_ids)
+  
+# Remove only one occurrence of each assigned id from avail (preserves order)
+available_minus_assigned <- function(avail, assigned) {
+  out <- avail
+  if (length(assigned)) {
+    for (a in assigned) {
+      i <- match(a, out)      # first occurrence
+      if (!is.na(i)) out <- out[-i]  # remove just one
+    }
+  }
+  out
+}
 
-  # Helper: pick highest-ranked topic for sid from current round's available,
-  # excluding topics the student already has in previous rounds.
-  first_available_for <- function(sid, available_vec) {
-    prefs_for_s <- student_id_lists[[sid]]
-    if (is.null(prefs_for_s)) return(NA_character_)
-    available_for_student <- setdiff(available_vec, assigned_by_student[[sid]])
-    choice <- purrr::keep(prefs_for_s, ~ .x %in% available_for_student) %>%
-      purrr::pluck(1, .default = NA_character_)
-    choice
+# Helper: pick highest-ranked topic for sid from current round's available,
+# excluding ANY topic the student already has (set exclusion).
+first_available_for <- function(sid, available_vec) {
+  # be type-consistent
+  available_vec <- as.character(available_vec)
+
+  prefs_for_s <- student_id_lists[[sid]]
+  if (is.null(prefs_for_s)) return(NA_character_)
+
+  # EXCLUDE all copies of already-assigned topics for THIS student
+  available_for_student <- setdiff(available_vec, assigned_by_student[[sid]])
+
+  # highest-ranked remaining preference
+  purrr::detect(prefs_for_s, ~ .x %in% available_for_student,
+                .default = NA_character_)
+}
+
+  # Debug version of the picker; prints prefs, availability filtering, and final choice
+debug_first_available_for <- function(sid, available_vec) {
+  sid_key <- as.character(sid)
+  cat("\n=== debug_first_available_for sid:", sid_key, "===\n")
+
+  prefs_for_s <- student_id_lists[[sid_key]]
+  cat("prefs_for_s:   ", if (is.null(prefs_for_s)) "NULL" else paste(prefs_for_s, collapse = " "), "\n")
+  if (is.null(prefs_for_s)) {
+    cat("-> No prefs for this sid. Returning NA.\n")
+    return(NA_integer_)
   }
 
+  already <- assigned_by_student[[sid_key]]
+  cat("already:       ", if (is.null(already)) "NULL" else paste(already, collapse = " "), "\n")
+
+  cat("global avail:  ", paste(available_vec, collapse = " "), "\n")
+
+  # Use the debug multiset subtraction so you see removals step-by-step
+  available_for_student <- available_minus_assigned(
+    avail = available_vec,
+    assigned = if (is.null(already)) integer(0) else already
+  )
+
+  # Choose the highest-ranked preference that is still available
+  cat("available_for_student:", paste(available_for_student, collapse = " "), "\n")
+
+  # Filter prefs by availability and show the filtered list
+  keep_mask <- prefs_for_s %in% available_for_student
+  filtered <- prefs_for_s[keep_mask]
+  cat("filtered prefs:", if (length(filtered)) paste(filtered, collapse = " ") else "(none)", "\n")
+
+  # Take first if present, otherwise NA
+  choice <- if (length(filtered)) filtered[[1]] else NA_integer_
+  cat("choice:        ", ifelse(is.na(choice), "NA", as.character(choice)), "\n")
+  choice
+}
+
+# Remove exactly one occurrence of a value from a vector
+remove_one <- function(vec, value) {
+  i <- match(value, vec)   # index of first occurrence
+  if (!is.na(i)) {
+    vec <- vec[-i]         # drop just that one
+  }
+  vec
+}
+  
   # 2) Process each round independently with a fresh random order
   for (r in seq_len(n_rounds)) {
     available <- topic_pools[[r]]
     order_vec <- sample(student_ids, n_students)  # new random order each round
-
     for (sid in order_vec) {
       # 3) Candidate set excludes already-assigned topics for THIS student only
-      choice <- first_available_for(sid, available)
-
+      choice <- debug_first_available_for(sid, available)
       if (is.na(choice)) {
         # With pool size == #students and valid prefs, this shouldn't happen.
         # If it does, it means the student's ranked list doesn't contain any of the
         # round's remaining topics (after excluding already-assigned). We stop to avoid silent NAs.
         stop(
-          sprintf(
-            "No assignable topic for student '%s' in round %d. ",
-            sid, r
-          ),
+          sprintf("No assignable topic for student '%s' in round %d. ", sid, r),
           "Check that their preferences include this round's topics ",
           "beyond those already assigned in prior rounds. Another reason could be that the last remaining topic for the student was already assigned to them in the first round.",
           call. = FALSE
         )
       }
-
+      
       assign_mat[sid, r] <- choice
       # 4) Remove the chosen topic from THIS ROUND's availability (no duplicates in the round)
-      available <- setdiff(available, choice)
+      available <- remove_one(available, choice)
       # Track for this student across rounds (prevents repeats for the same student)
       assigned_by_student[[sid]] <- c(assigned_by_student[[sid]], choice)
     }
   }
-
+  
   tibble::as_tibble(assign_mat, rownames = "student_id") %>%
     dplyr::arrange(student_id)
 }
