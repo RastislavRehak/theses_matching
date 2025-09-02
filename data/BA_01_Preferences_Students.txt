@@ -1,6 +1,7 @@
-student_id, preference_1, preference_2, preference_3, preference_4, preference_5
+student_id, preference_1, preference_2, preference_3, preference_4
 Jane Doe, 4, 2
 John Smith, 3
 Darth Vader, 1, 2, 4
 Arnold, 2, 4, 3
 Donald, 3
+Mike, 4, 3, 2

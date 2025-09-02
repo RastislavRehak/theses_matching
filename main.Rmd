@@ -6,9 +6,10 @@ date: "2025-08-26"
 
 
 ```{r}
-student_preferences_round_1_path <- "data/BA_01_Preferences_Students.txt"
-number_topics <- 4
-available_topic_ids <- 1:number_topics
+student_preferences_round_1_path <- "data/BA_01_Preferences_Students.csv"
+n_topics <- 4
+available_topic_ids <- 1:n_topics
+n_topics_per_student <- 2
 ```
 
 ```{r}
@@ -24,9 +25,12 @@ student_preferences_round_1 <- read_csv(
   file = here(student_preferences_round_1_path)
   )
 
+n_students <- nrow(student_preferences_round_1)
+
+
 student_preferences_round_1_long <- student_preferences_round_1 |>
   pivot_longer(
-    cols = preference_1:preference_5,
+    cols = tidyselect::all_of(paste0("preference_", seq_len(n_topics))),
     names_to = "topic_id",
     names_prefix = "preference_",
     values_to = "rank")
@@ -48,60 +52,200 @@ validate_prefs <- function(preferences, objects) {
     arrange(student_id, rank)
 }
 
-# Step 1 - Create topic Pool for round 1
-
-
-# Step 2 - 
-
+# Preparations
+## Create long randomized list of topic ids to use as filler.
+topics_filler <- unlist(replicate(n_topics_per_student, sample(available_topic_ids), simplify = FALSE))
 
 
 
-# allocate_by_random_serial_dictatorship <- function(preferences, topic_ids, topics_per_student = 1, seed = NULL) {
+# Step 1 - Create Topic Pools
+
+create_topic_pool <- function(round) {
+    multiplier <- ceiling(n_students / n_topics)
+    
+    if(multiplier < 1) {
+      message("The case that there are more topics than students is not yet supported.")
+    } else if(multiplier == 1) {
+      tf <- NULL
+    } else {
+    n_filler <- (n_topics * multiplier) %% n_students
+    beginning <- ((round - 1) * n_filler) + 1
+    tf <- topics_filler[beginning:(beginning + n_filler - 1)]
+    }
+    topic_pool <- c(rep(available_topic_ids, multiplier), tf)
+  
+  # sanity check
+  if(length(topic_pool) != n_students) {
+    message(paste0("There is something wrong with the topic pool generation for round ", round))
+  }
+  return(topic_pool)
+}
+
+topic_pools <- lapply(1:n_topics_per_student, function(r) create_topic_pool(r))
+```
+
+
+```{r}
+# Step 2 - allocate topics by random serial dictatorship
+allocate_by_random_serial_dictatorship <- function(
+  preferences,
+  topic_pools,              # list: one vector of topic_ids per round
+  seed = NULL
+) {
+  if (!is.null(seed)) set.seed(seed)
+
+  # Validate preferences against the union of all topics that can ever appear
+  all_topic_ids <- unique(unlist(topic_pools, use.names = FALSE))
+  prefs <- validate_prefs(preferences, all_topic_ids)
+
+  student_ids <- unique(prefs$student_id)
+  n_students  <- length(student_ids)
+  n_rounds    <- length(topic_pools)
+
+  # 1) Hard-fail if any round's pool size != number of students
+  pool_sizes <- vapply(topic_pools, length, integer(1))
+  bad_rounds <- which(pool_sizes != n_students)
+  if (length(bad_rounds) > 0) {
+    stop(
+      "Pool size mismatch: each round must have exactly ", n_students,
+      " topics (one per student). Offending rounds: ",
+      paste0(sprintf("#%d (size=%d)", bad_rounds, pool_sizes[bad_rounds]), collapse = ", "),
+      call. = FALSE
+    )
+  }
+
+  # Fast lookup: each student's ordered preference list (best -> worst)
+  student_id_lists <- prefs %>%
+    dplyr::arrange(student_id, rank) %>%
+    dplyr::group_by(student_id) %>%
+    dplyr::summarise(pref_list = list(topic_id), .groups = "drop") %>%
+    tibble::deframe()
+
+  # Output: rows = students, cols = rounds
+  assign_mat <- matrix(
+    NA_character_, nrow = n_students, ncol = n_rounds,
+    dimnames = list(student_ids, paste0("topic_", seq_len(n_rounds)))
+  )
+
+  # Track topics already assigned to each student across rounds
+  assigned_by_student <- stats::setNames(vector("list", n_students), student_ids)
+
+  # Helper: pick highest-ranked topic for sid from current round's available,
+  # excluding topics the student already has in previous rounds.
+  first_available_for <- function(sid, available_vec) {
+    prefs_for_s <- student_id_lists[[sid]]
+    if (is.null(prefs_for_s)) return(NA_character_)
+    available_for_student <- setdiff(available_vec, assigned_by_student[[sid]])
+    choice <- purrr::keep(prefs_for_s, ~ .x %in% available_for_student) %>%
+      purrr::pluck(1, .default = NA_character_)
+    choice
+  }
+
+  # 2) Process each round independently with a fresh random order
+  for (r in seq_len(n_rounds)) {
+    available <- topic_pools[[r]]
+    order_vec <- sample(student_ids, n_students)  # new random order each round
+
+    for (sid in order_vec) {
+      # 3) Candidate set excludes already-assigned topics for THIS student only
+      choice <- first_available_for(sid, available)
+
+      if (is.na(choice)) {
+        # With pool size == #students and valid prefs, this shouldn't happen.
+        # If it does, it means the student's ranked list doesn't contain any of the
+        # round's remaining topics (after excluding already-assigned). We stop to avoid silent NAs.
+        stop(
+          sprintf(
+            "No assignable topic for student '%s' in round %d. ",
+            sid, r
+          ),
+          "Check that their preferences include this round's topics ",
+          "beyond those already assigned in prior rounds. Another reason could be that the last remaining topic for the student was already assigned to them in the first round.",
+          call. = FALSE
+        )
+      }
+
+      assign_mat[sid, r] <- choice
+      # 4) Remove the chosen topic from THIS ROUND's availability (no duplicates in the round)
+      available <- setdiff(available, choice)
+      # Track for this student across rounds (prevents repeats for the same student)
+      assigned_by_student[[sid]] <- c(assigned_by_student[[sid]], choice)
+    }
+  }
+
+  tibble::as_tibble(assign_mat, rownames = "student_id") %>%
+    dplyr::arrange(student_id)
+}
+
+topic_allocation_round_1 <- allocate_by_random_serial_dictatorship(preferences = student_preferences_round_1_long,
+                                                                   topic_pools = topic_pools,
+                                                                   seed = 20250821)
+
+
+
+# allocate_by_random_serial_dictatorship <- function(
+#   preferences,
+#   topic_pools,              # list: one vector of topic_ids per round
+#   seed = NULL
+# ) {
 #   if (!is.null(seed)) set.seed(seed)
 # 
-#   prefs <- validate_prefs(preferences, topic_ids)
+#   # Validate preferences against the union of all topics that can ever appear
+#   all_topic_ids <- unique(unlist(topic_pools, use.names = FALSE))
+#   prefs <- validate_prefs(preferences, all_topic_ids)
+# 
 #   student_ids <- unique(prefs$student_id)
+#   n_students  <- length(student_ids)
+#   n_rounds    <- length(topic_pools)
 # 
-#   for i in seq_len(topics_per_student) {
-#     
-#   }
-#   order_vec <- sample(student_ids, length(student_ids)) 
-# 
-#   available <- topic_ids
-#   picks <- vector("character", length(student_ids))
-#   names(picks) <- student_ids
-# 
-#   # Build a fast lookup of each student_id's ordered list
+#   # Fast lookup: each student's ordered preference list (best -> worst)
 #   student_id_lists <- prefs %>%
-#     arrange(student_id, rank) %>%
-#     group_by(student_id) %>%
-#     summarise(pref_list = list(topic_id), .groups = "drop") %>%
-#     deframe()
+#     dplyr::arrange(student_id, rank) %>%
+#     dplyr::group_by(student_id) %>%
+#     dplyr::summarise(pref_list = list(topic_id), .groups = "drop") %>%
+#     tibble::deframe()
 # 
-#   # Serial dictatorship
-#   for (a in order_vec) {
-#     # highest-ranked available topic_id for student_id a
-#     choice <- keep(student_id_lists[[a]], ~ .x %in% available) %>% pluck(1, .default = NA_character_)
-#     if (!is.na(choice)) {
-#       picks[a] <- choice
-#       # remove chosen topic_id from availability
-#       available <- setdiff(available, choice)
-#     } else {
-#       picks[a] <- NA_character_
-#     }
-#     if (length(available) == 0L) break
+#   # Output matrix: rows = students, cols = rounds
+#   assign_mat <- matrix(
+#     NA_character_, nrow = n_students, ncol = n_rounds,
+#     dimnames = list(student_ids, paste0("topic_", seq_len(n_rounds)))
+#   )
+# 
+#   # Helper: first available preferred topic for a student within a given pool
+#   first_available_for <- function(sid, available_vec) {
+#     prefs_for_s <- student_id_lists[[sid]]
+#     if (is.null(prefs_for_s)) return(NA_character_)
+#     # first element of the student's ordered prefs that is still available this round
+#     choice <- purrr::keep(prefs_for_s, ~ .x %in% available_vec) %>%
+#       purrr::pluck(1, .default = NA_character_)
+#     choice
 #   }
 # 
-#   tibble(student_id = names(picks), topic_id = unname(picks)) %>%
-#     arrange(student_id)
-# }
+#   # Process each round independently
+#   for (r in seq_len(n_rounds)) {
+#     available <- topic_pools[[r]]
+#     if (length(available) == 0L) next
 # 
-# allocation_round_1 <- allocate_by_random_serial_dictatorship(
-#   preferences = student_preferences_round_1_long,
-#   topic_ids = available_topic_ids,
-#   seed = 20250826
-# )
-  
+#     order_vec <- sample(student_ids, n_students)  # fresh random order each round
+# 
+#     for (sid in order_vec) {
+#       if (length(available) == 0L) break
+#       choice <- first_available_for(sid, available)
+#       if (!is.na(choice)) {
+#         assign_mat[sid, r] <- choice
+#         # remove chosen topic from this round's availability
+#         available <- setdiff(available, choice)
+#       }
+#     }
+#   }
+# 
+#   tibble::as_tibble(assign_mat, rownames = "student_id") %>%
+#     dplyr::arrange(student_id)
+# }
+
+
+
+
 
 ```
 
