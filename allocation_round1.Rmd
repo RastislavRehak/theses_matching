@@ -1,0 +1,46 @@
+```{r Setup}
+# load libraries
+library(tidyverse)
+library(here)
+
+# set base folder
+here::i_am("allocation_round1.Rmd")
+
+# Import utils and config
+purrr::walk(
+  list.files(here::here("utils"), pattern = "\\.R$", full.names = TRUE),
+  source
+)
+source(here("config.R"))
+```
+
+# Load and prepare data
+```{r}
+# Safely load topics
+topics <- load_topics(here(topics_path))
+
+print(topics)
+```
+
+
+```{r}
+# Safely load student preferences
+
+student_preferences_round1 <- load_student_preferences(student_preferences_round1_path, topics$topic_id)
+
+print(student_preferences_round1)
+```
+
+# Allocate Students by Random Serial Dictatorship
+```{r}
+allocations_round1 <- allocate_by_rsd(student_preferences_round1, topic_capacity, allocation_seed_round1)
+
+allocations_round1
+```
+
+# Write output
+
+```{r}
+
+```
+
