@@ -1,4 +1,106 @@
-.Rproj.user
+############################################################
+# Git Ignore for R / RStudio Projects (with renv support)
+# "Publication-ready" version with clear, minimal rules
+############################################################
+
+############################
+# 1. R session and history #
+############################
+
 .Rhistory
+.Rapp.history
 .RData
 .Ruserdata
+
+########################
+# 2. RStudio artifacts #
+########################
+
+# Project user settings (machine-specific, do not commit)
+.Rproj.user/
+
+# NOTE: Keep the *.Rproj file itself under version control
+# (it defines the RStudio project).
+# Example:
+# myproject.Rproj
+
+###########################
+# 3. renv (R dependency)  #
+###########################
+
+# Local library and staging area (large, machine-specific)
+renv/library/
+renv/staging/
+
+# NOTE: Do NOT ignore:
+#   renv.lock
+#   renv/activate.R
+#   renv/settings.dcf
+# These files should be versioned to ensure reproducible environments.
+
+########################################
+# 4. R Markdown / Quarto build outputs #
+########################################
+
+# Knitr / RMarkdown / Quarto cache directories
+*_cache/
+cache/
+
+# Knitr intermediate Markdown
+*.utf8.md
+*.knit.md
+
+# Optional: ignore rendered outputs if you only want to track sources
+# Uncomment as needed:
+# *.html
+# *.pdf
+# *.docx
+
+######################################
+# 5. R package build/check artifacts #
+######################################
+
+# R CMD check output
+*.Rcheck/
+
+# Built package archives
+*.tar.gz
+*.tgz
+*.zip
+
+# pkgdown / documentation site (if generated)
+# Uncomment if you rebuild the site from source each time:
+# docs/
+
+################################
+# 6. System / editor junk files #
+################################
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Common editor/IDE files
+*.swp
+*.swo
+*.tmp
+*~
+
+#######################
+# 7. Local config/secrets
+#######################
+
+# Local R environment config and secrets
+.Renviron
+.Renviron.local
+.Rprofile.local
+
+# Generic environment files
+.env
+.env.local
