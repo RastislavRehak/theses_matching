@@ -33,14 +33,25 @@ print(student_preferences_round1)
 
 # Allocate Students by Random Serial Dictatorship
 ```{r}
-allocations_round1 <- allocate_by_rsd(student_preferences_round1, topic_capacity, allocation_seed_round1)
+# allocate and output student perspective
+allocations_round1_students <- allocate_by_rsd(student_preferences_round1, topic_capacity, allocation_seed_round1)
 
-allocations_round1
+print(allocations_round1_students)
 ```
 
-# Write output
+
 
 ```{r}
+# pivot to topic perspective
+allocations_round1_supervisors <- pivot_to_topic_perspective(allocations_round1_students)
 
+print(allocations_round1_supervisors)
+```
+
+# Write output to file
+
+```{r}
+write_csv(allocations_round1_students, allocations_round1_students_path)
+write_csv(allocations_round1_supervisors, allocations_round1_supervisors_path)
 ```
 

@@ -110,7 +110,63 @@ allocate_by_rsd <- function(data, capacity = NULL, seed = NULL) {
   enframe(results, name = "student_id", value = "topic") %>%
     unnest(topic) %>%
     group_by(student_id) %>%
-    mutate(n = paste0("assigned_", row_number())) %>%
+    mutate(n = paste0("topic", row_number())) %>%
     ungroup() %>%
     pivot_wider(names_from = n, values_from = topic)
+}
+
+#' Reshape Allocation Data to Topic Perspective
+#'
+#' This function pivots allocation data from a student-centric view (one row per student)
+#' to a topic-centric view (one row per topic). It is primarily used to generate
+#' class lists or supervisor dashboards from raw allocation tables.
+#'
+#' @section Transformation Logic:
+#' The function transforms the data based on the following three steps:
+#'
+#' 1. **Pivot to Long Format**: It consolidates multiple topic columns (e.g., `topic1`,
+#'    `topic2`) into vertical entries, creating one row per student-topic pair.
+#'
+#' 2. **Clean Assignments**: Rows containing `NA` values (where a student had fewer
+#'    assignments than the maximum columns) are removed to ensure only valid
+#'    allocations remain.
+#'
+#' 3. **Aggregation**: The data is grouped by `topic_id`, and all students assigned
+#'    to that topic are combined into a single comma-separated text string.
+#'
+#' @param data A dataframe or tibble containing allocation data.
+#' @param student_col The column containing student identifiers (default: `student_id`).
+#' @param topic_cols A tidyselect expression to choose columns containing topic assignments
+#'   (default: `starts_with("topic")`).
+#'
+#' @return A tibble with two columns:
+#'   * `topic_id`: The unique identifier for the topic.
+#'   * `students`: A character string listing all students assigned to that topic,
+#'     separated by commas.
+#'
+#' @importFrom tidyverse pivot_longer drop_na group_by summarise arrange
+#' @export
+pivot_to_topic_perspective <- function(
+  data,
+  student_col = student_id,
+  topic_cols = starts_with("topic")
+) {
+  data %>%
+    # Pivot columns defined by topic_cols (default is "starts_with('topic')")
+    pivot_longer(
+      cols = {{ topic_cols }},
+      names_to = "original_col_name", # Temporary column name, won't be in final output
+      values_to = "topic_id"
+    ) %>%
+    # Remove NAs (students without a 2nd topic)
+    drop_na(topic_id) %>%
+    # Group by the topic ID
+    group_by(topic_id) %>%
+    # Summarise the student column (dynamically selected) into a string
+    summarise(
+      students = paste({{ student_col }}, collapse = ", "),
+      .groups = "drop" # Ungroup after summarizing
+    ) %>%
+    # Sort for readability
+    arrange(topic_id)
 }

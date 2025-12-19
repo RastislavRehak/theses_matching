@@ -53,20 +53,6 @@ load_topics <- function(file_path) {
   return(df)
 }
 
-# read_student_preferences <- function(filepath) {
-#   raw <- read.table(
-#     filepath,
-#     sep = ",",
-#     header = FALSE,
-#     fill = TRUE,
-#     na.strings = c("", "NA"),
-#     stringsAsFactors = FALSE
-#   )
-#   colnames(raw) <- c("student_id", paste0("pref", 1:(ncol(raw) - 1)))
-#
-#   as_tibble(raw)
-# }
-
 #' Load and Validate Student Preferences (Wide Format)
 #'
 #' Reads a ragged CSV file. Validates inputs and returns a wide dataframe
@@ -137,5 +123,101 @@ load_student_preferences <- function(file_path, valid_topic_ids) {
 
   # 3. Summary and Return
   print(paste(nrow(raw), "students loaded."))
+  return(raw)
+}
+
+#' Load and Validate Supervisor Preferences (Wide Format)
+#'
+#' Reads a ragged CSV file where the first column is the Topic ID and subsequent
+#' columns are ranked Students. Validates that topics and students exist.
+#'
+#' @param file_path String. The full path to the file.
+#' @param valid_topic_ids Vector. A list of valid topic IDs (from load_topics).
+#' @param valid_student_ids Vector. A list of valid student IDs (from load_student_preferences).
+#' @return A tibble with `topic_id`, `pref1`, `pref2`, etc.
+#' @importFrom dplyr as_tibble select starts_with
+#' @importFrom stringr str_trim
+load_supervisor_preferences <- function(
+  file_path,
+  valid_topic_ids,
+  valid_student_ids
+) {
+  # 1. Setup and Read
+  if (!file.exists(file_path)) {
+    stop(paste("File not found at:", file_path))
+  }
+
+  # Ensure constraints are character vectors
+  valid_topic_ids <- as.character(valid_topic_ids)
+  valid_student_ids <- as.character(valid_student_ids)
+
+  # Use read.table because lines have variable lengths (ragged)
+  raw <- read.table(
+    file_path,
+    sep = ",",
+    header = FALSE,
+    fill = TRUE, # Allows ragged rows
+    na.strings = c("", "NA"),
+    colClasses = "character",
+    strip.white = TRUE,
+    stringsAsFactors = FALSE
+  )
+
+  # Rename columns: Col 1 is Topic, others are Student Ranks
+  colnames(raw) <- c("topic_id", paste0("pref", 1:(ncol(raw) - 1)))
+  raw <- as_tibble(raw)
+
+  # 2. Validation
+
+  # A. Check for Duplicate Topics (One topic cannot be configured on two lines)
+  if (any(duplicated(raw$topic_id))) {
+    dupes <- unique(raw$topic_id[duplicated(raw$topic_id)])
+    stop(paste(
+      "Duplicate entries for the same Topic ID found:",
+      paste(dupes, collapse = ", ")
+    ))
+  }
+
+  # B. Check for Unknown Topic IDs (Col 1)
+  unknown_topics <- setdiff(raw$topic_id, valid_topic_ids)
+  if (length(unknown_topics) > 0) {
+    stop(paste(
+      "Supervisor references unknown Topic IDs:",
+      paste(unknown_topics, collapse = ", ")
+    ))
+  }
+
+  # C. Check for Unknown Student IDs (Cols 2+)
+  # Gather all preferences, remove NAs, and check against valid list
+  all_ranked_students <- raw %>%
+    select(starts_with("pref")) %>%
+    unlist() %>%
+    na.omit() %>%
+    str_trim()
+
+  unknown_students <- setdiff(all_ranked_students, valid_student_ids)
+
+  if (length(unknown_students) > 0) {
+    stop(paste(
+      "Supervisor references unknown Student IDs (check for typos):",
+      paste(unknown_students, collapse = ", ")
+    ))
+  }
+
+  # D. Check for Self-Duplication (Same student ranked twice for one topic)
+  has_row_dupes <- apply(select(raw, starts_with("pref")), 1, function(x) {
+    choices <- na.omit(x)
+    any(duplicated(choices))
+  })
+
+  if (any(has_row_dupes)) {
+    stop(paste(
+      "Topic(s) where the same student was ranked twice:",
+      paste(raw$topic_id[has_row_dupes], collapse = ", ")
+    ))
+  }
+
+  # 3. Summary and Return
+  print(paste(nrow(raw), "supervisor preference rules loaded."))
   return(raw)
 }

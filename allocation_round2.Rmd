@@ -1,0 +1,73 @@
+```{r Setup}
+# load libraries
+library(tidyverse)
+library(here)
+library(matchingR)
+
+# set base folder
+here::i_am("allocation_round2.Rmd")
+
+# Import utils and config
+purrr::walk(
+  list.files(here::here("utils"), pattern = "\\.R$", full.names = TRUE),
+  source
+)
+source(here("config.R"))
+```
+
+# Load and prepare data
+```{r}
+# Safely load topics
+topics <- load_topics(here(topics_path))
+
+print(topics)
+```
+
+```{r}
+# Safely load supervisor preferences
+
+supervisor_preferences <- load_supervisor_preferences(here(supervisor_preferences_path), topics$topic_id, student_preferences_round2$student_id)
+print(supervisor_preferences)
+```
+
+
+
+
+```{r}
+# Safely load student preferences
+
+student_preferences_round2 <- load_student_preferences(here(student_preferences_round2_path), topics$topic_id)
+
+print(student_preferences_round2)
+```
+
+# Allocate Students by Supervisor-Proposing Deferred Acceptance
+
+```{r}
+allocation_output <- allocate_by_da(
+  student_prefs = student_preferences_round2, 
+  supervisor_prefs = supervisor_preferences, 
+  topics = topics
+)
+```
+
+```{r}
+#matches
+allocations_round2 <- allocation_output$matches
+print(allocations_round2)
+```
+
+```{r}
+# unassigned students/topics
+unassigned_round2 <- allocation_output$unassigned
+
+print(unassigned_round2)
+```
+
+# Write output
+
+```{r}
+write_csv(allocations_round2, here(allocations_round2_path))
+write_csv(unassigned_round2, here(unassigned_round2_path))
+```
+

@@ -33,5 +33,6 @@ With this R project, we want to implement a two-stage thesis allocation system. 
 - BA_07_Allocations.txt (final allocation of students to topics; list all students who submitted something, even the unassigned ones with topic NA; list all topics, even the unassigned ones with student NA)
 
 # Open ToDos
-- talk to rasto if the currently implemented rsd logic is as intended
-- refactor round 1 functions
+- talk to rasto if the currently implemented rsd and da logics are as intended
+- refactor everything
+- make readme really helpful
