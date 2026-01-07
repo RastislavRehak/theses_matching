@@ -36,3 +36,5 @@ With this R project, we want to implement a two-stage thesis allocation system. 
 - talk to rasto if the currently implemented rsd and da logics are as intended
 - refactor everything
 - make readme really helpful
+
+Hey Rasto!
