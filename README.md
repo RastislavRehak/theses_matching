@@ -2,8 +2,11 @@
 
 With this R project, we want to implement a two-stage thesis allocation system. It works in the following way:
 
+Round 1
 1. Students hand in preferences for topics that were proposed by the supervisors.
-2. An algorithm assigns students to topics on which they can write proposals.
+2. An algorithm assigns students to topics on which they can write proposals. Every student gets the same number of topics to write proposals on.
+
+Round 2
 3. Students submit proposals and submit preferences for the topics they wrote proposals on. Supervisors rank the proposals by quality.
 4. An algorithm assigns students to topics for the final allocation.
 
@@ -15,6 +18,9 @@ With this R project, we want to implement a two-stage thesis allocation system. 
 
 ## Code
 - BA_02_Allocation.R (randomized serial dictatorship?)
+
+### RSD intuition
+there are s students and t topics. We will have s*2 allocations. The number of topic capacity for all topics is floor(s*2/t). The remaining allocation slots will be determined at random. Therefore, there will be as many topic slots as allocation slots. 
 
 ## Output
 - BA_03_Allocations.txt (allocation of students to topics on which they can write proposals; default capacity of topics is 2, but adaptive to the number of students)
@@ -36,5 +42,3 @@ With this R project, we want to implement a two-stage thesis allocation system. 
 - talk to rasto if the currently implemented rsd and da logics are as intended
 - refactor everything
 - make readme really helpful
-
-Hey Rasto!

@@ -1,5 +1,5 @@
 # USER PREFERENCES
-topic_capacity <- NULL # the number of students that shall be assigned to each topic. Leave NULL for automatic calculation that ensures every student gets at least one topic.
+n_topics_per_student <- 2 # the number of students that shall be assigned to each topic. Leave NULL for automatic calculation that ensures every student gets at least one topic.
 
 # PROGRAM DEFAULTS - usually do not change them
 ## Paths

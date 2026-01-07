@@ -18,6 +18,8 @@
 #'    Once the round finishes, waitlisted students are randomly assigned to any
 #'    remaining leftover spots before the next round begins.
 #'
+#' 4. **Availability of topics**:
+#'
 #' @param data A dataframe or tibble containing student data.
 #'   * Must contain a column named `student_id`.
 #'   * All other columns are treated as ranked preferences.
@@ -29,90 +31,142 @@
 #'
 #' @importFrom tidyverse enframe unnest group_by mutate ungroup pivot_wider
 #' @export
-allocate_by_rsd <- function(data, capacity = NULL, seed = NULL) {
+allocate_by_rsd <- function(
+  student_preferences,
+  topic_ids,
+  n_topics_per_student = 2,
+  seed = NULL
+) {
   if (!is.null(seed)) {
     set.seed(seed)
   }
 
   # Setup
-  topics <- unique(na.omit(unlist(data %>% select(starts_with("pref")))))
 
-  if (is.null(capacity)) {
-    # Each topic gets enough seats so that total capacity ≈ number of students
-    capacity <- max(1L, ceiling(nrow(data) / length(topics)))
-    print(paste0("Each topic has a capacity of ", capacity, " students."))
-  }
+  ## Numbers
 
-  usage <- setNames(rep(0, length(topics)), topics)
-  results <- list()
+  # if (is.null(capacity)) {
+  #   # Each topic gets enough seats so that total capacity ≈ number of students
+  #   capacity <- max(1L, ceiling(nrow(data) / length(topics)))
+  #   print(paste0("Each topic has a capacity of ", capacity, " students."))
+  # }
 
-  # Total Slots / Students = Max topics needed per person to fill everything
-  rounds <- ceiling((length(topics) * capacity) / nrow(data))
+  n_students <- length(student_preferences)
 
-  for (r in 1:rounds) {
-    # Rule 1: Sort randomly per round
-    queue <- sample(data$student_id)
-    held_back <- c()
+  n_topics <- length(topic_ids)
 
-    # --- Phase A: Priority Pick ---
-    for (id in queue) {
-      my_topics <- results[[as.character(id)]]
-      # Get valid prefs (ignoring NAs)
-      prefs <- na.omit(as.character(unlist(data[data$student_id == id, -1])))
+  topic_capacity_min <- floor(n_topics_per_student * n_students / n_topics)
 
-      picked <- NA
-      for (p in prefs) {
-        # Check: Spot free? AND Not duplicate for this student?
-        if (usage[p] < capacity && !(p %in% my_topics)) {
-          picked <- p
-          break
-        }
-      }
+  n_bonus_topics <- n_topics_per_student * n_students %% n_topics
 
-      if (!is.na(picked)) {
-        results[[as.character(id)]] <- c(my_topics, picked)
-        usage[picked] <- usage[picked] + 1
-      } else {
-        # Rule 3: Hold back
-        held_back <- c(held_back, id)
-      }
-    }
+  print(paste(
+    "[DEBUG] There are",
+    n_students,
+    "students,",
+    n_topics,
+    "topics and each topic has at least a capacity of",
+    topic_capacity_min,
+    ". This means that",
+    n_bonus_topics,
+    "need to be allocated one additional time."
+  ))
 
-    # --- Phase B: Held Back Allocation (Leftovers) ---
-    if (length(held_back) > 0) {
-      # Create pool of empty chairs ( Topic A, A, B, C...)
-      pool <- rep(names(usage), pmax(capacity - usage, 0))
+  # usage <- setNames(rep(0, length(topics)), topics)
 
-      for (hb in sample(held_back)) {
-        # Randomize waiting room
-        if (length(pool) == 0) {
-          break
-        }
-        my_topics <- results[[as.character(hb)]]
+  ## Create topic pool
 
-        # Select from pool, forbidding duplicates
-        valid_pool <- pool[!(pool %in% my_topics)]
+  # 1. Base pool: each topic repeated topic_capacity_min times
+  base_pool <- rep(topic_ids, each = topic_capacity_min)
 
-        if (length(valid_pool) > 0) {
-          # Random assignment from leftovers
-          pick <- sample(valid_pool, 1)
-          results[[as.character(hb)]] <- c(my_topics, pick)
+  # 2. Choose which topics get +1 capacity (distinct topics)
+  bonus_topics <- sample(topic_ids, size = n_bonus_topics, replace = FALSE)
 
-          # Update usage and remove chair from pool
-          usage[pick] <- usage[pick] + 1
-          pool <- pool[-match(pick, pool)]
-        }
-      }
-    }
-  }
+  # 3. Build the full topic pool
+  topic_pool <- c(base_pool, bonus_topics)
 
-  # Output: Convert to Wide Tibble
-  enframe(results, name = "student_id", value = "topic") %>%
-    unnest(topic) %>%
-    group_by(student_id) %>%
-    mutate(n = paste0("topic", row_number())) %>%
-    ungroup() %>%
-    pivot_wider(names_from = n, values_from = topic)
+  # (Optional) Randomize order of the pool
+  topic_pool <- sample(topic_pool)
+
+  print(paste("[DEBUG] Topic pool:", topic_pool))
+
+  ## Create Student Pool
+
+  student_pool <- student_preferences |>
+    tidyr::uncount(weights = n_topics_per_student, .id = "slot")
+
+  print(paste("[DEBUG] Student pool:", student_pool))
+
+  # TODO: Think about how to manage the "topic only once per student" thing. Maybe have one central register of students where their topics get removed as they got a topic assigned.
+
+  # results <- list()
+  #
+  # # Total Slots / Students = Max topics needed per person to fill everything
+  # # rounds <- ceiling((length(topics) * capacity) / nrow(data))
+  #
+  # for (r in 1:rounds) {
+  #   # Rule 1: Sort randomly per round
+  #   queue <- sample(data$student_id)
+  #   held_back <- c()
+  #
+  #   # --- Phase A: Priority Pick ---
+  #   for (id in queue) {
+  #     my_topics <- results[[as.character(id)]]
+  #     # Get valid prefs (ignoring NAs)
+  #     prefs <- na.omit(as.character(unlist(data[data$student_id == id, -1])))
+  #
+  #     picked <- NA
+  #     for (p in prefs) {
+  #       # Check: Spot free? AND Not duplicate for this student?
+  #       if (usage[p] < capacity && !(p %in% my_topics)) {
+  #         picked <- p
+  #         break
+  #       }
+  #     }
+  #
+  #     if (!is.na(picked)) {
+  #       results[[as.character(id)]] <- c(my_topics, picked)
+  #       usage[picked] <- usage[picked] + 1
+  #     } else {
+  #       # Rule 3: Hold back
+  #       held_back <- c(held_back, id)
+  #     }
+  #   }
+  #
+  #   # --- Phase B: Held Back Allocation (Leftovers) ---
+  #   if (length(held_back) > 0) {
+  #     # Create pool of empty chairs ( Topic A, A, B, C...)
+  #     pool <- rep(names(usage), pmax(capacity - usage, 0))
+  #
+  #     for (hb in sample(held_back)) {
+  #       # Randomize waiting room
+  #       if (length(pool) == 0) {
+  #         break
+  #       }
+  #       my_topics <- results[[as.character(hb)]]
+  #
+  #       # Select from pool, forbidding duplicates
+  #       valid_pool <- pool[!(pool %in% my_topics)]
+  #
+  #       if (length(valid_pool) > 0) {
+  #         # Random assignment from leftovers
+  #         pick <- sample(valid_pool, 1)
+  #         results[[as.character(hb)]] <- c(my_topics, pick)
+  #
+  #         # Update usage and remove chair from pool
+  #         usage[pick] <- usage[pick] + 1
+  #         pool <- pool[-match(pick, pool)]
+  #       }
+  #     }
+  #   }
+  # }
+  #
+  # # Output: Convert to Wide Tibble
+  # enframe(results, name = "student_id", value = "topic") %>%
+  #   unnest(topic) %>%
+  #   group_by(student_id) %>%
+  #   mutate(n = paste0("topic", row_number())) %>%
+  #   ungroup() %>%
+  #   pivot_wider(names_from = n, values_from = topic)
 }
 
 #' Reshape Allocation Data to Topic Perspective
