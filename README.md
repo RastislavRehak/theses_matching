@@ -1,17 +1,44 @@
-# Allocation of Bachelor Theses
+# Optimal Allocation of Bachelor Theses
 
-With this R project, we want to implement a two-stage thesis allocation system. It works in the following way:
+## Overview
 
-Round 1
-1. Students hand in preferences for topics that were proposed by the supervisors.
-2. An algorithm assigns students to topics on which they can write proposals. Every student gets the same number of topics to write proposals on.
+This R project delivers a robust, automated framework for assigning bachelor theses using a **two-stage matching market mechanism**.
 
-Round 2
-3. Students submit proposals and submit preferences for the topics they wrote proposals on. Supervisors rank the proposals by quality.
-4. An algorithm assigns students to topics for the final allocation.
+Allocating thesis topics involves balancing student interests, supervisor capacities, and academic merit. This tool solves this complexity by splitting the process into a **Proposal Phase** and a **Final Match Phase**.
 
+### The Workflow
 
-## Usage
+**Round 1: Proposal Distribution**
+*   **Goal:** Assign every student a fixed number of topics (e.g., 2) to explore and write proposals for.
+*   **Mechanism:** Students submit a ranked list of preferred topics.
+*   **Algorithm:** The system uses a **Integer Linear Programming (ILP)** algorithm to comply with a number of restrictions as outlined below.
+
+**Round 2: Final Allocation (Matching)**
+*   **Goal:** Determine the final, one-to-one Student-Supervisor pairs.
+*   **Mechanism:**
+    *   **Students** submit preferences for the topics they wrote proposals on.
+    *   **Supervisors** rank the received proposals based on quality.
+*   **Algorithm:** The system applies the **Deferred Acceptance (DA)** algorithm (Gale-Shapley).
+
+## Algorithm Justification
+
+### Round 1
+
+For **Round 1**, we utilize **Integer Linear Programming (ILP)** instead of standard sequential algorithms (like Random Serial Dictatorship or greedy selection). This decision was driven by three strict constraints that iterative algorithms frequently fail to satisfy simultaneously:
+
+*   **Strict Topic Balancing (Fair Distribution):** To ensure fairness for supervisors, the workload must be distributed evenly. We calculate dynamic `Min` and `Max` capacities for every topic (e.g., if there are 200 slots and 10 topics, every topic must have exactly 20 students). Standard algorithms often overfill popular topics early, violating the strict `Max` constraint for the group.
+*   **Guaranteed Assignment Quotas:** Every student **must** be assigned exactly $n$ distinct topics for their proposals. Iterative algorithms often "paint themselves into a corner"—satisfying the first 90% of students perfectly but leaving the last 10% with no valid topics left to choose from.
+*   **Global Optimization vs. Sequential Bias:** Sequential algorithms solve the problem one student at a time. If a student early in the queue takes a spot that is the *only* valid option for a student later in the queue, the system breaks. ILP looks at all students, all preferences, and all constraints simultaneously to find the global optimum that minimizes the total "cost" (dissatisfaction) of the cohort.
+
+### Round 2
+
+For **Round 2**, the system implements the **Supervisor-Proposing Deferred Acceptance Algorithm (Gale-Shapley)**. This configuration handles the matching based on the following structural constraints and optimization criteria:
+
+*   **Two-Sided Preference Integration:** The allocation functions as a two-sided matching market. It must integrate inputs from two distinct sets of ordinal rankings: **Student Preferences** (ranking of topics) and **Supervisor Preferences** (ranking of proposal quality/suitability).
+*   **Stability Condition:** The solution implies a strict validity constraint known as **Stability**. The algorithm ensures that no "blocking pair" exists—a scenario where a Supervisor and a Student both prefer each other over their assigned matches.
+*   **Supervisor-Optimality:** The choice of the Supervisor-Proposing variant enforces a specific optimization constraint. Among the set of all mathematically possible stable matchings, this algorithm selects the **Supervisor-Optimal** solution. This maximizes the assignment quality from the supervisors' perspective according to their submitted rankings.
+
+## Preparations
 
 Follow these steps to download the project and synchronize your R environment using the RStudio interface.
 
@@ -67,37 +94,50 @@ This project uses `renv` to ensure you have the exact correct versions of the re
 
 Once this completes, your environment is perfectly synchronized and ready to run the allocation tool.
 
+## Round 1 Allocation
 
+### Input
+The following files are required to be in the input folder. For all files there are examples in the respective folder.
 
+1. student_preferences_round1.txt -> a comma-separated txt file with no headings. First columns contains the student_id, the other columns contain the topic_ids in descending order of preferences (first topic is highest rank). Indifference is allowed.
+2. topics.txt -> same format as student_preferences. First column contains the topic_id, second column contains a name.
 
+### Running the Allocation
 
+Open the file allocation_round1.Rmd and run all chunks. It should proceed without errors, given that the input files are correct. 
 
-## Input
-- BA_01_Preferences_Students.txt (txt instead of csv because the preferences may not be complete---indifference)
+### Output
 
-## Code
-- BA_02_Allocation.R (randomized serial dictatorship?)
+In the output folder, you find two files with basically the same information but optimized for better readability:
 
-### RSD intuition
-there are s students and t topics. We will have s*2 allocations. The number of topic capacity for all topics is floor(s*2/t). The remaining allocation slots will be determined at random. Therefore, there will be as many topic slots as allocation slots. 
+1. allocations_round1_students.csv -> One row for each student with the assigned topics.
+2. allocations_round1_supervisors.csv -> One row for each topic with the assigned students.
 
-## Output
-- BA_03_Allocations.txt (allocation of students to topics on which they can write proposals; default capacity of topics is 2, but adaptive to the number of students)
+## Round 2 Allocation
 
+### Input
+The following files are required to be in the input folder.
 
-# Round 2
+1. student_preferences_round2.txt -> as above.
+2. supervisor_preferences.txt -> same format as student_preferences. First column contains the topic_id, other columns contain the student_ids in descending quality of their proposals (highest quality is first column).
+3. topics.txt -> as above, can be the same file.
 
-## Inputs
-- BA_04_Preferences_Students.txt (txt instead of csv because the preferences may not be complete---indifference; some students may drop at this stage---failure to submit any proposal)
-- BA_05_Preferences_Supervisors.txt (txt instead of csv because the preferences may not be complete---indifference)
+### Running the Allocation
 
-## Code
-- BA_06_Allocation.R (a modification of supervisor-proposing DA?)
+Open the file allocation_round2.Rmd and run all chunks.
 
-## Output
-- BA_07_Allocations.txt (final allocation of students to topics; list all students who submitted something, even the unassigned ones with topic NA; list all topics, even the unassigned ones with student NA)
+### Output
 
-# Open ToDos
-- talk to rasto if the currently implemented rsd and da logics are as intended
-- refactor everything
-- make readme really helpful
+In the output folder, you find these files:
+
+1. allocations_round2.csv -> One row for each matched topic/student combination.
+2. unassigned_round2.csv -> Contains all students or topics that could not get matched.
+
+## ToDo
+[x] talk to rasto if the currently implemented rsd and da logics are as intended
+[x] refactor everything
+[x] make readme really helpful
+[x] refactor examples
+[x] add algorithm choice considerations to README
+[] test with real data
+[] do an audit by a second person
