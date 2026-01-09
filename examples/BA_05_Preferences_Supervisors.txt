@@ -1,4 +1,0 @@
-1, John Smith, Darth Vader
-2, Jane Doe
-3, 
-4, Arnold
