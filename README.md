@@ -134,10 +134,10 @@ In the output folder, you find these files:
 2. unassigned_round2.csv -> Contains all students or topics that could not get matched.
 
 ## ToDo
-[x] talk to rasto if the currently implemented rsd and da logics are as intended
-[x] refactor everything
-[x] make readme really helpful
-[x] refactor examples
-[x] add algorithm choice considerations to README
-[] test with real data
-[] do an audit by a second person
+- [x] talk to rasto if the currently implemented rsd and da logics are as intended
+- [x] refactor everything
+- [x] make readme really helpful
+- [x] refactor examples
+- [x] add algorithm choice considerations to README
+- [ ] test with real data
+- [ ] do an audit by a second person
