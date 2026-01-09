@@ -34,11 +34,10 @@ print(student_preferences_round1)
 # Allocate Students by Random Serial Dictatorship
 ```{r}
 # allocate and output student perspective
-allocations_round1_students <- allocate_by_rsd(
+allocations_round1_students <- allocate_optimally(
   student_preferences = student_preferences_round1,
   topic_ids = topics$topic_id,
-  n_topics_per_student = n_topics_per_student, 
-  seed = allocation_seed_round1
+  n_topics_per_student = n_topics_per_student
   )
 
 allocations_round1_students
