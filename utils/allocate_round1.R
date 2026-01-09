@@ -32,7 +32,7 @@
 #'   Should be higher than the maximum number of preferences (default: 100).
 #'
 #' @return A wide-format tibble where each row represents a student, and columns
-#'   (`topic_1`, `topic_2`...) represent their assigned topics.
+#'   (`topic1`, `topic2`...) represent their assigned topics.
 #'
 #' @importFrom lpSolve lp
 #' @importFrom dplyr mutate select arrange row_number group_by ungroup
@@ -224,7 +224,7 @@ allocate_optimally <- function(
   ) |>
     tidyr::unnest(topic) |>
     dplyr::group_by(student_id) |>
-    dplyr::mutate(col_name = paste0("topic_", dplyr::row_number())) |>
+    dplyr::mutate(col_name = paste0("topic", dplyr::row_number())) |>
     dplyr::ungroup() |>
     tidyr::pivot_wider(names_from = col_name, values_from = topic)
 
