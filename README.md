@@ -48,6 +48,7 @@ Before starting, ensure you have the following installed on your computer:
 *   [R](https://cran.r-project.org/)
 *   [RStudio Desktop](https://posit.co/download/rstudio-desktop/)
 *   [Git](https://git-scm.com/downloads) (Required for RStudio to download the files)
+*   [Rtools](https://cran.r-project.org/bin/windows/Rtools/) (Required for building some R packages that are not available as a binary)
 
 ### 2. Download the Project (Cloning via RStudio)
 
