@@ -188,26 +188,9 @@ allocate_by_da <- function(
     )
   }
 
-  # Check stability
-  is_stable <- galeShapley.checkStability(
-    proposerUtils = u_supervisors,
-    reviewerUtils = u_students,
-    proposals = results$matched.colleges,
-    engagements = results$matched.students
-  )
-
-  if (debug) {
-    if (is_stable) {
-      cli::cli_alert_success("Matching is stable")
-    } else {
-      cli::cli_alert_danger("Matching is NOT stable")
-    }
-  }
-
   # --- 7. Return Results ---
   return(list(
     matches = matches,
-    unassigned = unassigned_df,
-    is_stable = is_stable
+    unassigned = unassigned_df
   ))
 }
