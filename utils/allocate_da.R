@@ -59,7 +59,7 @@ library(matchingR)
 allocate_by_da <- function(
   student_prefs,
   supervisor_prefs,
-  debug = FALSE
+  debug = TRUE
 ) {
   # --- 1. Setup ---
   student_list <- student_prefs$student_id

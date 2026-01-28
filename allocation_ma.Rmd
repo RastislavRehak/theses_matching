@@ -56,8 +56,7 @@ crossvalidate_preferences(student_preferences_ma, supervisor_preferences_ma)
 ```{r}
 allocation_output_ma <- allocate_by_da(
   student_prefs = student_preferences_ma, 
-  supervisor_prefs = supervisor_preferences_ma,
-  debug = TRUE
+  supervisor_prefs = supervisor_preferences_ma
 )
 ```
 
