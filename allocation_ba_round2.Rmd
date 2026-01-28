@@ -1,0 +1,82 @@
+```{r Setup}
+# load libraries
+library(tidyverse)
+library(here)
+library(matchingR)
+
+# set base folder
+here::i_am("allocation_ba_round2.Rmd")
+
+# Import utils and config
+purrr::walk(
+  list.files(here::here("utils"), pattern = "\\.R$", full.names = TRUE),
+  source
+)
+
+# Config
+# Input Paths
+student_preferences_ba_round2_path <- "input/student_preferences_ba_round2.txt"
+supervisor_preferences_ba_path <- "input/supervisor_preferences_ba.txt"
+
+# Output Paths
+allocations_ba_round2_path <- "output/allocations_ba_round2.csv"
+unassigned_ba_round2_path <- "output/unassigned_ba_round2.csv"
+```
+
+# Safely load data
+```{r}
+# Student preferences
+student_preferences_ba_round2 <- load_student_preferences(
+  file_path = here(student_preferences_ba_round2_path)
+  )
+
+print(student_preferences_ba_round2)
+```
+
+
+```{r}
+# Supervisor/Topic preferences
+
+supervisor_preferences_ba <- load_supervisor_preferences(
+  file_path = here(supervisor_preferences_ba_path),
+  implicit_capacity_1 = TRUE
+)
+print(supervisor_preferences_ba)
+```
+
+
+# Check Data Validity
+```{r}
+# Cross validate Student and Supervisor Preferences
+crossvalidate_preferences(student_preferences_ba_round2, supervisor_preferences_ba)
+```
+# Allocate Students by Supervisor-Proposing Deferred Acceptance
+
+```{r}
+allocation_output_ba_round2 <- allocate_by_da(
+  student_prefs = student_preferences_ba_round2, 
+  supervisor_prefs = supervisor_preferences_ba, 
+  debug = TRUE
+)
+```
+
+```{r}
+#matches
+allocations_ba_round2 <- allocation_output_ba_round2$matches
+print(allocations_ba_round2)
+```
+
+```{r}
+# unassigned students/topics
+unassigned_ba_round2 <- allocation_output_ba_round2$unassigned
+
+print(unassigned_ba_round2)
+```
+
+# Write output
+
+```{r}
+write_csv(allocations_ba_round2, here(allocations_ba_round2_path))
+write_csv(unassigned_ba_round2, here(unassigned_ba_round2_path))
+```
+

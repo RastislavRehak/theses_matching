@@ -1,0 +1,80 @@
+```{r Setup}
+# load libraries
+library(tidyverse)
+library(here)
+library(matchingR)
+
+# set base folder
+here::i_am("ma_allocation.Rmd")
+
+# Import utils
+purrr::walk(
+  list.files(here::here("utils"), pattern = "\\.R$", full.names = TRUE),
+  source
+)
+```
+
+```{r Config}
+# Input Paths
+supervisor_preferences_ma_path <- "input/supervisor_preferences_ma.txt"
+student_preferences_ma_path <- "input/student_preferences_ma.txt"
+
+# Output Paths
+allocations_ma_path <- "output/allocations_ma.csv"
+unassigned_ma_path <- "output/unassigned_ma.csv"
+```
+
+
+# Load and prepare data
+```{r}
+# Safely load supervisor preferences
+
+supervisor_preferences_ma <- load_supervisor_preferences_ma(here(supervisor_preferences_ma_path), implicit_capacity_1 = FALSE)
+
+print(supervisor_preferences_ma)
+```
+
+```{r}
+# Safely load student preferences
+
+student_preferences_ma <- load_student_preferences(here(student_preferences_ma_path))
+
+print(student_preferences_ma)
+```
+
+# Check Data Validity
+```{r}
+# Cross validate Student and Supervisor Preferences
+crossvalidate_preferences(student_preferences_ma, supervisor_preferences_ma)
+```
+
+
+# Allocate Students by Supervisor-Proposing Deferred Acceptance
+
+```{r}
+allocation_output_ma <- allocate_by_da(
+  student_prefs = student_preferences_ma, 
+  supervisor_prefs = supervisor_preferences_ma,
+  debug = TRUE
+)
+```
+
+```{r}
+#matches
+allocations_ma <- allocation_output_ma$matches
+print(allocations_ma)
+```
+
+```{r}
+# unassigned students/topics
+unassigned_ma <- allocation_output_ma$unassigned
+print(unassigned_ma)
+```
+
+# Write output
+
+```{r}
+write_csv(allocations_ma, here(allocations_ma_path))
+write_csv(unassigned_ma, here(unassigned_ma_path))
+```
+

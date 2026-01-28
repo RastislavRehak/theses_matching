@@ -14,6 +14,3 @@ allocations_round1_students_path <- "output/allocations_round1_students.csv"
 allocations_round1_supervisors_path <- "output/allocations_round1_supervisors.csv"
 allocations_round2_path <- "output/allocations_round2.csv"
 unassigned_round2_path <- "output/unassigned_round2.csv"
-
-## Seed
-allocation_seed_round1 <- 20250101
