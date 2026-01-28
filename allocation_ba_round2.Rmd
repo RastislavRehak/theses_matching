@@ -50,6 +50,7 @@ print(supervisor_preferences_ba)
 # Cross validate Student and Supervisor Preferences
 crossvalidate_preferences(student_preferences_ba_round2, supervisor_preferences_ba)
 ```
+
 # Allocate Students by Supervisor-Proposing Deferred Acceptance
 
 ```{r}

@@ -39,7 +39,7 @@
 #' @importFrom tidyr pivot_longer pivot_wider
 #' @importFrom tibble tibble enframe
 #' @export
-allocate_optimally <- function(
+allocate_gco <- function(
   student_preferences,
   topic_ids,
   n_topics_per_student = 2,

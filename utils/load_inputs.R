@@ -1,6 +1,41 @@
 library(dplyr)
 library(cli)
 
+load_topics <- function(file_path, debug = TRUE) {
+  # 1. File check
+  if (!file.exists(file_path)) {
+    cli::cli_abort("File not found: {file_path}")
+  }
+
+  # 2. Read ragged CSV
+  raw <- read.table(
+    file_path,
+    sep = ",",
+    header = FALSE,
+    fill = TRUE,
+    na.strings = c("", "NA"),
+    colClasses = "character",
+    strip.white = TRUE,
+    stringsAsFactors = FALSE
+  )
+
+  # 3. Handle column naming
+  colnames(raw) <- c("supervisor_id")
+  raw <- as_tibble(raw)
+
+  # 4. Validation
+  validate_no_duplicate_ids(raw$supervisor_id, "supervisor")
+
+  # 6. Summary
+  if (debug) {
+    cli::cli_alert_success(
+      "{nrow(raw)} topics loaded"
+    )
+  }
+
+  raw
+}
+
 #' Load and Validate Student Preferences (Wide Format)
 #'
 #' Reads a ragged CSV file. Validates inputs and returns a wide dataframe
