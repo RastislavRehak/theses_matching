@@ -1,28 +1,37 @@
-# Optimal Allocation of Bachelor Theses
+# Optimal Allocation of Theses
 
 ## Overview
 
-This R project delivers a robust, automated framework for assigning bachelor theses using a **two-stage matching market mechanism**.
+This R project delivers a robust, automated framework for assigning theses using **matching market mechanisms**. It supports both **Bachelor (BA)** and **Master (MA)** thesis allocation, each with its own workflow tailored to institutional requirements.
 
-Allocating thesis topics involves balancing student interests, supervisor capacities, and academic merit. This tool solves this complexity by splitting the process into a **Proposal Phase** and a **Final Match Phase**.
+| Program | Rounds | Mechanism |
+|---------|--------|-----------|
+| **Bachelor** | 2 rounds | ILP (proposal distribution) → Deferred Acceptance (final match) |
+| **Master** | 1 round | Deferred Acceptance (direct match) |
+
+---
+
+## Bachelor Thesis Allocation
+
+Allocating BA thesis topics involves balancing student interests, supervisor capacities, and academic merit. This tool solves this complexity by splitting the process into a **Proposal Phase** and a **Final Match Phase**.
 
 ### The Workflow
 
 **Round 1: Proposal Distribution**
 *   **Goal:** Assign every student a fixed number of topics (e.g., 2) to explore and write proposals for.
 *   **Mechanism:** Students submit a ranked list of preferred topics.
-*   **Algorithm:** The system uses a **Integer Linear Programming (ILP)** algorithm to comply with a number of restrictions as outlined below.
+*   **Algorithm:** The system uses **Integer Linear Programming (ILP)** to comply with constraints as outlined below.
 
 **Round 2: Final Allocation (Matching)**
-*   **Goal:** Determine the final, one-to-one Student-Supervisor pairs.
+*   **Goal:** Determine the final, one-to-one Student-Topic pairs.
 *   **Mechanism:**
     *   **Students** submit preferences for the topics they wrote proposals on.
     *   **Supervisors** rank the received proposals based on quality.
 *   **Algorithm:** The system applies the **Deferred Acceptance (DA)** algorithm (Gale-Shapley).
 
-## Algorithm Justification
+### Algorithm Justification
 
-### Round 1
+#### Round 1
 
 For **Round 1**, we utilize **Integer Linear Programming (ILP)** instead of standard sequential algorithms (like Random Serial Dictatorship or greedy selection). This decision was driven by three strict constraints that iterative algorithms frequently fail to satisfy simultaneously:
 
@@ -30,13 +39,38 @@ For **Round 1**, we utilize **Integer Linear Programming (ILP)** instead of stan
 *   **Guaranteed Assignment Quotas:** Every student **must** be assigned exactly $n$ distinct topics for their proposals. Iterative algorithms often "paint themselves into a corner"—satisfying the first 90% of students perfectly but leaving the last 10% with no valid topics left to choose from.
 *   **Global Optimization vs. Sequential Bias:** Sequential algorithms solve the problem one student at a time. If a student early in the queue takes a spot that is the *only* valid option for a student later in the queue, the system breaks. ILP looks at all students, all preferences, and all constraints simultaneously to find the global optimum that minimizes the total "cost" (dissatisfaction) of the cohort.
 
-### Round 2
+#### Round 2
 
 For **Round 2**, the system implements the **Supervisor-Proposing Deferred Acceptance Algorithm (Gale-Shapley)**. This configuration handles the matching based on the following structural constraints and optimization criteria:
 
 *   **Two-Sided Preference Integration:** The allocation functions as a two-sided matching market. It must integrate inputs from two distinct sets of ordinal rankings: **Student Preferences** (ranking of topics) and **Supervisor Preferences** (ranking of proposal quality/suitability).
 *   **Stability Condition:** The solution implies a strict validity constraint known as **Stability**. The algorithm ensures that no "blocking pair" exists—a scenario where a Supervisor and a Student both prefer each other over their assigned matches.
 *   **Supervisor-Optimality:** The choice of the Supervisor-Proposing variant enforces a specific optimization constraint. Among the set of all mathematically possible stable matchings, this algorithm selects the **Supervisor-Optimal** solution. This maximizes the assignment quality from the supervisors' perspective according to their submitted rankings.
+
+---
+
+## Master Thesis Allocation
+
+MA thesis allocation uses a simpler single-round process since students apply directly to supervisors rather than to predefined topics.
+
+### The Workflow
+
+**Single Round: Direct Matching**
+*   **Goal:** Match students to supervisors based on mutual preferences.
+*   **Mechanism:**
+    *   **Students** submit a ranked list of preferred supervisors.
+    *   **Supervisors** rank interested students based on fit and qualifications.
+*   **Algorithm:** The system applies the **Deferred Acceptance (DA)** algorithm (Gale-Shapley).
+
+### Algorithm Justification
+
+The **Supervisor-Proposing Deferred Acceptance Algorithm** is used for the same reasons as BA Round 2:
+
+*   **Two-Sided Preferences:** Both students and supervisors have rankings that must be respected.
+*   **Stability:** No student-supervisor pair should prefer each other over their assigned matches.
+*   **Supervisor-Optimality:** The algorithm prioritizes supervisor preferences, selecting the supervisor-optimal stable matching.
+
+---
 
 ## Preparations
 
@@ -59,7 +93,7 @@ You do not need to use the command line. You can download the project directly t
 
 2.  **Open New Project Wizard:**
     Open RStudio. Go to the menu bar at the top and select:
-    **File** $\to$ **New Project...**
+    **File** → **New Project...**
 
 3.  **Select Version Control:**
     In the "New Project" wizard, click the option **Version Control**.
@@ -95,50 +129,110 @@ This project uses `renv` to ensure you have the exact correct versions of the re
 
 Once this completes, your environment is perfectly synchronized and ready to run the allocation tool.
 
-## Round 1 Allocation
+---
 
-### Input
-The following files are required to be in the input folder. For all files there are examples in the respective folder.
+## Running Allocations
 
-1. student_preferences_round1.txt -> a comma-separated txt file with no headings. First columns contains the student_id, the other columns contain the topic_ids in descending order of preferences (first topic is highest rank). Indifference is allowed.
-2. topics.txt -> same format as student_preferences. First column contains the topic_id, second column contains a name.
+### BA Round 1: Proposal Distribution
 
-### Running the Allocation
+#### Input
 
-Open the file allocation_round1.Rmd and run all chunks. It should proceed without errors, given that the input files are correct. 
+Place the following files in the `input/` folder (see examples in folder):
 
-### Output
+| File | Format | Description |
+|------|--------|-------------|
+| `student_preferences_ba_round1.txt` | CSV, no header | Column 1: `student_id`. Remaining columns: `topic_id`s in preference order (best first). Ties allowed. |
+| `topics_ba.txt` | CSV, no header | Column 1: `topic_id`. Column 2: topic name. |
 
-In the output folder, you find two files with basically the same information but optimized for better readability:
+#### Running
 
-1. allocations_round1_students.csv -> One row for each student with the assigned topics.
-2. allocations_round1_supervisors.csv -> One row for each topic with the assigned students.
+Open `allocation_ba_round1.Rmd` and run all chunks.
 
-## Round 2 Allocation
+#### Output
 
-### Input
-The following files are required to be in the input folder.
+| File | Description |
+|------|-------------|
+| `allocations_ba_round1_students.csv` | One row per student with assigned topics |
+| `allocations_ba_round1_topics.csv` | One row per topic with assigned students |
 
-1. student_preferences_round2.txt -> as above.
-2. supervisor_preferences.txt -> same format as student_preferences. First column contains the topic_id, other columns contain the student_ids in descending quality of their proposals (highest quality is first column).
-3. topics.txt -> as above, can be the same file.
+---
 
-### Running the Allocation
+### BA Round 2: Final Matching
 
-Open the file allocation_round2.Rmd and run all chunks.
+#### Input
 
-### Output
+| File | Format | Description |
+|------|--------|-------------|
+| `student_preferences_ba_round2.txt` | CSV, no header | Column 1: `student_id`. Remaining columns: `topic_id`s in preference order. |
+| `supervisor_preferences_ba.txt` | CSV, no header | Column 1: `topic_id`. Remaining columns: `student_id`s ranked by proposal quality (best first). |
+| `topics_ba.txt` | CSV, no header | Same as Round 1. |
 
-In the output folder, you find these files:
+#### Running
 
-1. allocations_round2.csv -> One row for each matched topic/student combination.
-2. unassigned_round2.csv -> Contains all students or topics that could not get matched.
+Open `allocation_ba_round2.Rmd` and run all chunks.
+
+#### Output
+
+| File | Description |
+|------|-------------|
+| `allocations_ba_round2.csv` | One row per matched student-topic pair |
+| `unassigned_ba_round2.csv` | Unmatched students and topics |
+
+---
+
+### MA: Direct Matching
+
+#### Input
+
+| File | Format | Description |
+|------|--------|-------------|
+| `student_preferences_ma.txt` | CSV, no header | Column 1: `student_id`. Remaining columns: `supervisor_id`s in preference order (best first). |
+| `supervisor_preferences_ma.txt` | CSV, no header | Column 1: `supervisor_id`. Remaining columns: `student_id`s ranked by preference (best first). |
+| `supervisors_ma.txt` | CSV, no header | Column 1: `supervisor_id`. Column 2: supervisor name. |
+
+#### Running
+
+Open `allocation_ma.Rmd` and run all chunks.
+
+#### Output
+
+| File | Description |
+|------|-------------|
+| `allocations_ma.csv` | One row per matched student-supervisor pair |
+| `unassigned_ma.csv` | Unmatched students and supervisors |
+
+---
+
+## Project Structure
+
+```
+├── input/
+│   ├── student_preferences_ba_round1.txt
+│   ├── student_preferences_ba_round2.txt
+│   ├── supervisor_preferences_ba.txt
+│   ├── topics_ba.txt
+│   ├── student_preferences_ma.txt
+│   ├── supervisor_preferences_ma.txt
+│   └── supervisors_ma.txt
+├── output/
+│   └── (generated files)
+├── R/
+│   └── (helper functions)
+├── allocation_ba_round1.Rmd
+├── allocation_ba_round2.Rmd
+├── allocation_ma.Rmd
+└── README.md
+```
+
+---
 
 ## ToDo
-- [x] talk to rasto if the currently implemented rsd and da logics are as intended
-- [x] refactor everything
-- [x] make readme really helpful
-- [x] refactor examples
-- [x] add algorithm choice considerations to README
-- [ ] test with real data
-- [ ] do an audit by a second person
+
+- [x] Talk to Rasto if the currently implemented RSD and DA logics are as intended
+- [x] Refactor everything
+- [x] Make README really helpful
+- [x] Refactor examples
+- [x] Add algorithm choice considerations to README
+- [x] Add MA thesis allocation
+- [ ] Test with real data
+- [ ] Do an audit by a second person
