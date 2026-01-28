@@ -1,173 +1,61 @@
-library(tidyverse)
+library(dplyr)
 library(matchingR)
-#'
-#' #' Allocate Students to Topics via Deferred Acceptance (Gale-Shapley)
-#' #'
-#' #' Implements the Gale-Shapley "Marriage Market" algorithm to assign students to
-#' #' dissertation topics (supervisors). In this specific implementation,
-#' #' **Supervisors (Topics) are the Proposers** and **Students are the Reviewers**.
-#' #'
-#' #' @description
-#' #' This function takes rank-ordered preference lists from students and supervisors,
-#' #' converts them into utility matrices, and performs a one-to-one matching.
-#' #' It guarantees a stable matching, meaning there is no pair  (Student A, Topic B)
-#' #' where both would prefer each other over their current assignment.
-#' #'
-#' #' @param student_prefs A dataframe containing student preferences.
-#' #'   \itemize{
-#' #'     \item Column 1: \code{student_id} (Unique identifier).
-#' #'     \item Columns 2..N: Ranked preferences (Topic IDs). First column after ID is Rank 1.
-#' #'   }
-#' #' @param supervisor_prefs A dataframe containing supervisor/topic preferences.
-#' #'   \itemize{
-#' #'     \item Column 1: \code{topic_id} (Unique identifier).
-#' #'     \item Columns 2..N: Ranked preferences (Student IDs). First column after ID is Rank 1.
-#' #'   }
-#' #' @param topics_df A dataframe containing the master list of topics.
-#' #'   \itemize{
-#' #'     \item Must contain a column \code{topic_id}.
-#' #'   }
-#' #'
-#' #' @details
-#' #' The function converts the dataframe rankings into utility scores.
-#' #' \itemize{
-#' #'   \item For a supervisor, their 1st choice student gets the highest score (N students),
-#' #'   2nd choice gets (N-1), etc. Unlisted students get 0.
-#' #'   \item For a student, their 1st choice topic gets the highest score, etc.
-#' #' }
-#' #'
-#' #' Any \code{NA} or empty strings in the preference columns are ignored.
-#' #'
-#' #' @return A list containing three elements:
-#' #' \item{matches}{A tibble with two columns: \code{topic_id} and \code{student_id}, representing the successful pairings.}
-#' #' \item{unassigned}{A tibble with two columns: \code{type} ("Topic" or "Student") and \code{id}, listing any participants who did not get a match.}
-#' #' \item{is_stable}{A logical (TRUE/FALSE) indicating if the resulting matching is stable according to the Gale-Shapley definition.}
-#' #'
-#' #' @examples
-#' #' \dontrun{
-#' #' # 1. Define Topics
-#' #' topics_df <- tibble(topic_id = c("T1", "T2", "T3"))
-#' #'
-#' #' # 2. Student Preferences (S1 wants T1, S2 wants T2, S3 wants T1)
-#' #' student_choices <- tibble(
-#' #'   student_id = c("S1", "S2", "S3"),
-#' #'   pref1 = c("T1", "T2", "T1"),
-#' #'   pref2 = c("T2", "T1", "T2")
-#' #' )
-#' #'
-#' #' # 3. Supervisor Preferences (T1 completes for S1 and S3)
-#' #' supervisor_choices <- tibble(
-#' #'   topic_id = c("T1", "T2", "T3"),
-#' #'   pref1 = c("S3", "S2", NA), # T3 has no preferences (will go unassigned)
-#' #'   pref2 = c("S1", NA, NA)
-#' #' )
-#' #'
-#' #' # 4. Run Allocation
-#' #' result <- allocate_by_da(student_choices, supervisor_choices, topics_df)
-#' #'
-#' #' # 5. Inspect
-#' #' print(result$matches)
-#' #' print(result$unassigned)
-#' #' }
-#' #'
-#' #' @import tidyverse
-#' #' @import matchingR
-#' #' @export
-#'
-#' allocate_by_da <- function(student_prefs, supervisor_prefs, topics_df) {
-#'   # --- 1. Setup ---
-#'   student_list <- student_prefs$student_id
-#'   topic_list <- topics_df$topic_id
-#'
-#'   n_students <- length(student_list)
-#'   n_topics <- length(topic_list)
-#'
-#'   # --- 2. Supervisor Utils (Proposers) ---
-#'   # Rows = Students (Reviewers), Cols = Topics (Proposers)
-#'   u_supervisors <- matrix(0, nrow = n_students, ncol = n_topics)
-#'
-#'   for (i in 1:nrow(supervisor_prefs)) {
-#'     t_id <- supervisor_prefs$topic_id[i]
-#'     col_idx <- match(t_id, topic_list)
-#'
-#'     pref_cols <- grep("^pref", names(supervisor_prefs))
-#'     prefs <- as.character(supervisor_prefs[i, pref_cols])
-#'     prefs <- prefs[!is.na(prefs) & prefs != ""]
-#'
-#'     scores <- seq(from = n_students, by = -1, length.out = length(prefs))
-#'     row_idxs <- match(prefs, student_list)
-#'
-#'     valid_mask <- !is.na(row_idxs)
-#'     if (any(valid_mask)) {
-#'       u_supervisors[row_idxs[valid_mask], col_idx] <- scores[valid_mask]
-#'     }
-#'   }
-#'
-#'   # --- 3. Student Utils (Reviewers) ---
-#'   # Rows = Topics, Cols = Students
-#'   u_students <- matrix(0, nrow = n_topics, ncol = n_students)
-#'
-#'   for (i in 1:nrow(student_prefs)) {
-#'     s_id <- student_prefs$student_id[i]
-#'     col_idx <- match(s_id, student_list)
-#'
-#'     prefs <- as.character(student_prefs[i, -1])
-#'     prefs <- prefs[!is.na(prefs) & prefs != ""]
-#'
-#'     scores <- seq(from = n_topics, by = -1, length.out = length(prefs))
-#'     row_idxs <- match(prefs, topic_list)
-#'
-#'     valid_mask <- !is.na(row_idxs)
-#'     if (any(valid_mask)) {
-#'       u_students[row_idxs[valid_mask], col_idx] <- scores[valid_mask]
-#'     }
-#'   }
-#'
-#'   # --- 4. Run Matching (DA Algorithm) ---
-#'   results <- galeShapley.marriageMarket(
-#'     proposerUtils = u_supervisors,
-#'     reviewerUtils = u_students
-#'   )
-#'
-#'   # --- 5. Format 'Matches' Tibble ---
-#'   matches <- tibble(
-#'     topic_id = topic_list,
-#'     student_idx = results$proposals
-#'   ) %>%
-#'     mutate(
-#'       student_id = student_list[student_idx]
-#'     ) %>%
-#'     select(topic_id, student_id) %>%
-#'     filter(!is.na(student_id)) # Exclude topics that found no student here
-#'
-#'   # --- 6. Format 'Unassigned' Tibble ---
-#'   # Get names of unmatched items
-#'   unmatched_topics <- topic_list[results$single.proposers]
-#'   unmatched_students <- student_list[results$single.reviewers]
-#'
-#'   # Combine into one tibble
-#'   unassigned_df <- bind_rows(
-#'     tibble(type = "Topic", id = unmatched_topics),
-#'     tibble(type = "Student", id = unmatched_students)
-#'   )
-#'
-#'   # Check stability
-#'   is_stable <- galeShapley.checkStability(
-#'     u_supervisors,
-#'     u_students,
-#'     results$proposals,
-#'     results$engagements
-#'   )
-#'
-#'   # --- 7. Return Results ---
-#'   return(list(
-#'     matches = matches,
-#'     unassigned = unassigned_df,
-#'     is_stable = is_stable
-#'   ))
-#' }
 
-# NEW
+#' Allocate Students to Supervisors via Deferred Acceptance (Gale-Shapley)
+#'
+#' Implements the college admissions variant of Gale-Shapley where supervisors
+#' can accept multiple students up to their capacity. Supervisors propose,
+#' students review - yielding a supervisor-optimal stable matching.
+#'
+#' @param student_prefs A tibble with columns:
+#'   \describe{
+#'     \item{student_id}{Unique student identifier (character)}
+#'     \item{pref1, pref2, ...}{Ranked supervisor IDs, best first}
+#'   }
+#' @param supervisor_prefs A tibble with columns:
+#'   \describe{
+#'     \item{supervisor_id}{Unique supervisor identifier (character)}
+#'     \item{capacity}{Integer, number of students this supervisor can take}
+#'     \item{pref1, pref2, ...}{Ranked student IDs, best first}
+#'   }
+#' @param debug Logical. If TRUE, prints progress via cli. Default FALSE.
+#'
+#' @return A list with three elements:
+#'   \describe{
+#'     \item{matches}{Tibble with columns \code{supervisor_id} and \code{student_id}}
+#'     \item{unassigned}{Tibble with columns \code{type} ("Supervisor"/"Student") and \code{id}}
+#'     \item{is_stable}{Logical indicating matching stability}
+#'   }
+#'
+#' @details
+#' Utility scores are assigned as: 1st choice = N, 2nd = N-1, etc.
+#' Unranked participants receive 0 (acceptable but least preferred).
+#'
+#' The matching is stable: no student-supervisor pair mutually prefer
+#' each other over their current assignment.
+#'
+#' @examples
+#' \dontrun{
+#' students <- tibble(
+#'   student_id = c("S1", "S2", "S3"),
+#'   pref1 = c("Alice", "Bob", "Alice"),
+#'   pref2 = c("Bob", "Alice", "Bob")
+#' )
+#'
+#' supervisors <- tibble(
+#'   supervisor_id = c("Alice", "Bob"),
+#'   capacity = c(2, 1),
+#'   pref1 = c("S1", "S2"),
+#'   pref2 = c("S3", "S1")
+#' )
+#'
+#' result <- allocate_by_da(students, supervisors)
+#' }
+#'
+#' @import dplyr
+#' @importFrom matchingR galeShapley.collegeAdmissions galeShapley.checkStability
+#' @export
+
 allocate_by_da <- function(
   student_prefs,
   supervisor_prefs,
@@ -183,19 +71,20 @@ allocate_by_da <- function(
   if (debug) {
     cli::cli_h2("DA Allocation Setup")
     cli::cli_alert_info("Students: {n_students}")
-    cli::cli_alert_info("Supervisors: {n_supervisors}")
+    cli::cli_alert_info("Supervisors/Topics: {n_supervisors}")
   }
 
   # --- 2. Supervisor Utils (Proposers) ---
   # Rows = Students (Reviewers), Cols = Supervisors (Proposers)
   u_supervisors <- matrix(0, nrow = n_students, ncol = n_supervisors)
 
-  for (i in 1:nrow(supervisor_prefs)) {
+  pref_cols_sup <- grep("^pref", names(supervisor_prefs), value = TRUE)
+
+  for (i in seq_len(nrow(supervisor_prefs))) {
     su_id <- supervisor_prefs$supervisor_id[i]
     col_idx <- match(su_id, supervisor_list)
 
-    prefs <- as.character(supervisor_prefs[i, -1])
-    prefs <- prefs[!is.na(prefs) & prefs != ""]
+    prefs <- as.character(supervisor_prefs[i, pref_cols_sup])
 
     scores <- seq(from = n_students, by = -1, length.out = length(prefs))
     row_idxs <- match(prefs, student_list)
@@ -206,7 +95,9 @@ allocate_by_da <- function(
     }
 
     if (debug && length(prefs) > 0) {
-      cli::cli_alert("Supervisor {su_id}: {length(prefs)} preferences loaded")
+      cli::cli_alert(
+        "Supervisor {su_id}: {sum(valid_mask)}/{length(prefs)} preferences valid"
+      )
     }
   }
 
@@ -214,12 +105,13 @@ allocate_by_da <- function(
   # Rows = Supervisors, Cols = Students
   u_students <- matrix(0, nrow = n_supervisors, ncol = n_students)
 
-  for (i in 1:nrow(student_prefs)) {
+  pref_cols_stu <- grep("^pref", names(student_prefs), value = TRUE)
+
+  for (i in seq_len(nrow(student_prefs))) {
     s_id <- student_prefs$student_id[i]
     col_idx <- match(s_id, student_list)
 
-    prefs <- as.character(student_prefs[i, -1])
-    prefs <- prefs[!is.na(prefs) & prefs != ""]
+    prefs <- as.character(student_prefs[i, pref_cols_stu])
 
     scores <- seq(from = n_supervisors, by = -1, length.out = length(prefs))
     row_idxs <- match(prefs, supervisor_list)
@@ -296,18 +188,26 @@ allocate_by_da <- function(
     )
   }
 
-  # # Check stability
-  # is_stable <- galeShapley.checkStability(
-  #   proposerUtils = u_supervisors,
-  #   reviewerUtils = u_students,
-  #   proposals = results$matched.colleges,
-  #   engagements = results$matched.students
-  # )
+  # Check stability
+  is_stable <- galeShapley.checkStability(
+    proposerUtils = u_supervisors,
+    reviewerUtils = u_students,
+    proposals = results$matched.colleges,
+    engagements = results$matched.students
+  )
+
+  if (debug) {
+    if (is_stable) {
+      cli::cli_alert_success("Matching is stable")
+    } else {
+      cli::cli_alert_danger("Matching is NOT stable")
+    }
+  }
 
   # --- 7. Return Results ---
   return(list(
     matches = matches,
-    unassigned = unassigned_df
-    #is_stable = is_stable
+    unassigned = unassigned_df,
+    is_stable = is_stable
   ))
 }
