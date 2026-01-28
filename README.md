@@ -141,12 +141,12 @@ Place the following files in the `input/` folder (see examples in folder):
 
 | File | Format | Description |
 |------|--------|-------------|
-| `student_preferences_ba_round1.txt` | CSV, no header | Column 1: `student_id`. Remaining columns: `topic_id`s in preference order (best first). Ties allowed. |
-| `topics_ba.txt` | CSV, no header | Column 1: `topic_id`. Column 2: topic name. |
+| `student_preferences_ba_round1.txt` | TXT, no header | Column 1: `student_id`. Remaining columns: `topic_id`s in preference order (best first). |
+| `topics_ba.txt` | TXT, no header | Column 1: `topic_id`. |
 
 #### Running
 
-Open `allocation_ba_round1.Rmd` and run all chunks.
+Open `allocation_ba_round1.Rmd` and adjust `n_topics_per_student` if necessary (default: 2). Then run all chunks.
 
 #### Output
 
@@ -163,9 +163,8 @@ Open `allocation_ba_round1.Rmd` and run all chunks.
 
 | File | Format | Description |
 |------|--------|-------------|
-| `student_preferences_ba_round2.txt` | CSV, no header | Column 1: `student_id`. Remaining columns: `topic_id`s in preference order. |
-| `supervisor_preferences_ba.txt` | CSV, no header | Column 1: `topic_id`. Remaining columns: `student_id`s ranked by proposal quality (best first). |
-| `topics_ba.txt` | CSV, no header | Same as Round 1. |
+| `student_preferences_ba_round2.txt` | TXT, no header | Column 1: `student_id`. Remaining columns: `supervisor_id`s (i.e. topic ids) in preference order. |
+| `supervisor_preferences_ba.txt` | TXT, no header | Column 1: `supervisor_id`. Remaining columns: `student_id`s ranked by proposal quality (best first). |
 
 #### Running
 
@@ -176,7 +175,7 @@ Open `allocation_ba_round2.Rmd` and run all chunks.
 | File | Description |
 |------|-------------|
 | `allocations_ba_round2.csv` | One row per matched student-topic pair |
-| `unassigned_ba_round2.csv` | Unmatched students and topics |
+| `unassigned_ba_round2.csv` | Unmatched students or supervisors/topics |
 
 ---
 
@@ -186,9 +185,8 @@ Open `allocation_ba_round2.Rmd` and run all chunks.
 
 | File | Format | Description |
 |------|--------|-------------|
-| `student_preferences_ma.txt` | CSV, no header | Column 1: `student_id`. Remaining columns: `supervisor_id`s in preference order (best first). |
-| `supervisor_preferences_ma.txt` | CSV, no header | Column 1: `supervisor_id`. Remaining columns: `student_id`s ranked by preference (best first). |
-| `supervisors_ma.txt` | CSV, no header | Column 1: `supervisor_id`. Column 2: supervisor name. |
+| `student_preferences_ma.txt` | TXT, no header | Column 1: `student_id`. Remaining columns: `supervisor_id`s in preference order (best first). |
+| `supervisor_preferences_ma.txt` | TXT, no header | Column 1: `supervisor_id`. Column 2: `capacity` of the supervisor. Remaining columns: `student_id`s ranked by preference (best first). |
 
 #### Running
 
@@ -203,29 +201,6 @@ Open `allocation_ma.Rmd` and run all chunks.
 
 ---
 
-## Project Structure
-
-```
-├── input/
-│   ├── student_preferences_ba_round1.txt
-│   ├── student_preferences_ba_round2.txt
-│   ├── supervisor_preferences_ba.txt
-│   ├── topics_ba.txt
-│   ├── student_preferences_ma.txt
-│   ├── supervisor_preferences_ma.txt
-│   └── supervisors_ma.txt
-├── output/
-│   └── (generated files)
-├── R/
-│   └── (helper functions)
-├── allocation_ba_round1.Rmd
-├── allocation_ba_round2.Rmd
-├── allocation_ma.Rmd
-└── README.md
-```
-
----
-
 ## ToDo
 
 - [x] Talk to Rasto if the currently implemented RSD and DA logics are as intended
@@ -234,5 +209,6 @@ Open `allocation_ma.Rmd` and run all chunks.
 - [x] Refactor examples
 - [x] Add algorithm choice considerations to README
 - [x] Add MA thesis allocation
-- [ ] Test with real data
+- [ ] Test with real and simulated data
+- [ ] merge with main
 - [ ] Do an audit by a second person

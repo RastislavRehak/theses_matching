@@ -21,7 +21,7 @@ topics_ba_path <- "input/topics_ba.txt"
 
 ## Output Paths
 allocations_ba_round1_students_path <- "output/allocations_ba_round1_students.csv"
-allocations_ba_round1_supervisors_path <- "output/allocations_ba_round1_supervisors.csv"
+allocations_ba_round1_supervisors_path <- "output/allocations_ba_round1_topics.csv"
 ```
 
 # Safely load data
