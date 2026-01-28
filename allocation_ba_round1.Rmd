@@ -27,9 +27,9 @@ allocations_ba_round1_supervisors_path <- "output/allocations_ba_round1_supervis
 # Safely load data
 ```{r}
 # Supervisors/Topics
-supervisors_ba_round1 <- load_topics(topics_ba_path)
+topics_ba <- load_topics(topics_ba_path)
 
-print(supervisors_ba_round1)
+print(topics_ba)
 ```
 
 
@@ -42,19 +42,19 @@ print(student_preferences_ba_round1)
 # Check Data Validity
 ```{r}
 # Cross validate Student and Supervisor Preferences
-crossvalidate_preferences(student_preferences_ba_round1, supervisors_ba_round1)
+crossvalidate_preferences(student_preferences_ba_round1, topics_ba |> rename(supervisor_id = topic_id))
 ```
 
 # Allocate Students using Global Cost Optimization
 ```{r}
 # allocate and output student perspective
 allocations_ba_round1_students <- allocate_gco(
-  student_preferences = student_preferences_ba_round1,
-  topic_ids = supervisors_ba_round1$supervisor_id,
+  student_prefs = student_preferences_ba_round1,
+  topic_ids = topics_ba$topic_id,
   n_topics_per_student = n_topics_per_student
   )
 
-allocations_ba_round1_students
+print(allocations_ba_round1_students)
 ```
 
 
@@ -62,7 +62,7 @@ allocations_ba_round1_students
 # pivot to topic perspective
 allocations_ba_round1_supervisors <- pivot_to_topic_perspective(allocations_ba_round1_students)
 
-allocations_ba_round1_supervisors
+print(allocations_ba_round1_supervisors)
 ```
 
 # Write output to file

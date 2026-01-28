@@ -1,13 +1,27 @@
-library(dplyr)
-library(cli)
-
+#' Load and Validate Topic List
+#'
+#' Reads a single-column CSV file containing topic IDs.
+#'
+#' @param file_path String. Path to the CSV file.
+#' @param debug Logical. If TRUE, prints diagnostic messages.
+#'
+#' @return A tibble with a single `topic_id` column.
+#'
+#' @examples
+#' \dontrun{
+#' topics <- load_topics("data/topics.csv")
+#' }
+#'
+#' @importFrom dplyr as_tibble
+#' @importFrom cli cli_abort cli_alert_success
+#' @export
 load_topics <- function(file_path, debug = TRUE) {
-  # 1. File check
+  # 1. Validate file exists
   if (!file.exists(file_path)) {
-    cli::cli_abort("File not found: {file_path}")
+    cli::cli_abort("File not found: {.path {file_path}}")
   }
 
-  # 2. Read ragged CSV
+  # 2. Read CSV
   raw <- read.table(
     file_path,
     sep = ",",
@@ -19,22 +33,23 @@ load_topics <- function(file_path, debug = TRUE) {
     stringsAsFactors = FALSE
   )
 
-  # 3. Handle column naming
-  colnames(raw) <- c("supervisor_id")
-  raw <- as_tibble(raw)
+  # 3. Structure output
 
-  # 4. Validation
-  validate_no_duplicate_ids(raw$supervisor_id, "supervisor")
+  raw <- dplyr::as_tibble(raw, .name_repair = "minimal")
+  colnames(raw) <- "topic_id"
 
-  # 6. Summary
+  # 4. Validate
+
+  validate_no_duplicate_ids(raw$topic_id, "topic")
+
+  # 5. Summary
   if (debug) {
-    cli::cli_alert_success(
-      "{nrow(raw)} topics loaded"
-    )
+    cli::cli_alert_success("{nrow(raw)} topic{?s} loaded")
   }
 
   raw
 }
+
 
 #' Load and Validate Student Preferences (Wide Format)
 #'
