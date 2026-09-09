@@ -71,13 +71,16 @@ if(is.list(allocations_ba_round1_students) && !is.data.frame(allocations_ba_roun
 ```
 
 ```{r}
-# Choose most feasible solution (solution_x: pref_solution <- x)
-pref_solution <- 1
-
 if(is.list(allocations_ba_round1_students) && !is.data.frame(allocations_ba_round1_students)) {
-allocations_ba_round1_students <- allocations_ba_round1_students[pref_solution]
+  
+  # Choose most feasible solution (solution_x: pref_solution <- x)
+  pref_solution <- 1
+
+
+  allocations_ba_round1_students <- allocations_ba_round1_students[[pref_solution]]
 }
 
+print(allocations_ba_round1_students)
 ```
 
 ```{r}
@@ -93,4 +96,3 @@ print(allocations_ba_round1_supervisors)
 write_csv(allocations_ba_round1_students, allocations_ba_round1_students_path)
 write_csv(allocations_ba_round1_supervisors, allocations_ba_round1_supervisors_path)
 ```
-
