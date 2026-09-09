@@ -70,7 +70,6 @@ if(is.list(allocations_ba_round1_students) && !is.data.frame(allocations_ba_roun
     student_preferences_ba_round1
   )
 }
-
 ```
 
 ```{r}
@@ -83,8 +82,6 @@ if(is.list(allocations_ba_round1_students) && !is.data.frame(allocations_ba_roun
 
   print(allocations_ba_round1_students)
 }
-
-
 ```
 
 ```{r}
