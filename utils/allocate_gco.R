@@ -135,15 +135,17 @@ allocate_gco <- function(
   )
   
   # Retrieve number of solutions
-  n_solutions <- nrow(solution)
-  if (n_solutions == 1) {
-    cli::cli_alert_info("Solution is unique")
-  }
-  else if (n_solutions < max_solutions) {
-    cli::cli_alert_info("Several solutions found: {n_solutions} solutions")
-  }
-  else if (n_solutions == max_solutions) {
-    cli::cli_alert_info("Several solutions found: {n_solutions} solutions. Further solutions may exist")
+  if(debug) {
+    n_solutions <- nrow(solution)
+    if (n_solutions == 1) {
+      cli::cli_alert_info("Solution is unique")
+    }
+    else if (n_solutions < max_solutions) {
+      cli::cli_alert_info("Multiple solutions found: {n_solutions} solutions")
+    }
+    else if (n_solutions == max_solutions) {
+      cli::cli_alert_info("Multiple solutions found: {n_solutions} solutions created. Further solutions may exist")
+    }
   }
 
   # --- 7. Format Results ---
