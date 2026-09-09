@@ -147,7 +147,7 @@ allocate_gco <- function(
 
   # --- 7. Format Results ---
   result <- lapply(seq_len(nrow(solution)), function(i) {
-    parse_solution(solution[i, ], n_students, topic_ids, student_ids)
+    format_solution(solution[i, ], n_students, topic_ids, student_ids)
   })
   
   # Name solutions
@@ -249,41 +249,6 @@ build_ilp_constraints <- function(
 }
 
 
-#' Format ILP Solution into Tibble
-#' @keywords internal
-format_ilp_results <- function(
-  solution_vec,
-  student_ids,
-  topic_ids,
-  n_students
-) {
-  # Reshape binary vector to matrix
-  result_matrix <- matrix(
-    solution_vec,
-    nrow = n_students,
-    byrow = TRUE,
-    dimnames = list(student_ids, topic_ids)
-  )
-
-  # Extract assigned topics for each student
-  assignments <- apply(
-    result_matrix,
-    1,
-    function(row) {
-      names(row)[row == 1]
-    },
-    simplify = FALSE
-  )
-
-  # Convert to wide tibble
-  tibble::enframe(assignments, name = "student_id", value = "topics") |>
-    tidyr::unnest(topics) |>
-    dplyr::group_by(student_id) |>
-    dplyr::mutate(col = paste0("topic", dplyr::row_number())) |>
-    dplyr::ungroup() |>
-    tidyr::pivot_wider(names_from = col, values_from = topics)
-}
-
 #' Find multiple solutions
 #' @keywords internal
 find_multiple_solutions <- function(
@@ -339,7 +304,10 @@ find_multiple_solutions <- function(
   solution
 }
 
-parse_solution <- function(solution_vector, n_students, topic_ids, student_ids) {
+
+#' Format ILP Solutions into Tibbles
+#' @keywords internal
+format_solution <- function(solution_vector, n_students, topic_ids, student_ids) {
   
   # Reshape the binary solution vector back into a matrix
   # Dimensions: Rows = Students, Cols = Topics
