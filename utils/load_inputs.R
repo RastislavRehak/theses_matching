@@ -212,7 +212,7 @@ crossvalidate_preferences <- function(
   }
 
   if (debug) {
-    cli::cli_alert_success("Cross-validation passed: all references valid")
+    cli::cli_alert_success("Cross-validation passed: all preferences valid")
   }
 
   invisible(TRUE)
