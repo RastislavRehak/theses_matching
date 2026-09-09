@@ -340,6 +340,65 @@ format_solution <- function(solution_vector, n_students, topic_ids, student_ids)
 }
 
 
+#' Convert list of tibbles into xlsx
+#' 
+#' This function converts the output from the matching algorithm into an Excel-Sheet.
+#' This is necessary if multiple solutions are possible and those solutions need to 
+#' be compared to find the most preferable solution out of the set of optimal solutions.
+#' 
+#' @param solution_list The list of solutions resulting from optimization.
+#' @param path String. Path to the directory where the file should be saved.
+#' 
+#' @return An xlsx-file containing all found solutions and the student preferences. 
+export_multiple_solutions <- function(solution_list, 
+                           student_preferences,
+                           path = here::here("output", "multiple_solutions.xlsx"),
+                           gap = 1,
+                           row_gap = 2) {
+  
+  # Convert characters to numeric
+  to_numeric <- function(df) {
+    dplyr::mutate(df, dplyr::across(
+      where(is.character) & where(~ all(!is.na(suppressWarnings(as.numeric(.))) | is.na(.))),
+      as.numeric
+    ))
+  }
+  student_preferences <- to_numeric(student_preferences)
+  solution_list <- lapply(solution_list,to_numeric)
+  
+  # Create ouput folder if not existing
+  dir.create(here::here("output"), showWarnings = FALSE)
+  
+  # Create workbook and worksheet
+  wb <- openxlsx::createWorkbook()
+  openxlsx::addWorksheet(wb, "Tibbles")
+  
+  # Display student preferences on the top of the sheet
+  openxlsx::writeData(wb, "Tibbles", "Student Preferences", startCol = 1, startRow = 1)
+  openxlsx::writeData(wb, "Tibbles", student_preferences, startCol = 1, startRow = 2)
+  
+  # Set starting row for tibbles
+  start_row <- 2 + nrow(student_preferences) + 1 + row_gap
+  
+  # Add tibble by tibble with 1 column gap
+  start_col <- 1
+  sol_names <- names(solution_list)
+  
+  for (i in seq_along(solution_list)) {
+    tbl <- solution_list[[i]]
+    
+    openxlsx::writeData(wb, "Tibbles", sol_names[i], startCol = start_col, startRow = start_row)
+    openxlsx::writeData(wb, "Tibbles", tbl, startCol = start_col, startRow = start_row + 1)
+    start_col <- start_col + ncol(tbl) + gap
+  }
+  
+  # Save to defined path
+  openxlsx::saveWorkbook(wb, path, overwrite = TRUE)
+  invisible(path)
+}
+
+
+
 #' Reshape Allocation Data to Topic Perspective
 #'
 #' Pivots allocation data from student-centric (one row per student)
