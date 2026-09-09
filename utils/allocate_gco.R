@@ -14,6 +14,7 @@
 #' @param topic_ids Character vector of valid topic IDs.
 #' @param n_topics_per_student Integer. Topics to assign each student (default: 2).
 #' @param penalty_value Integer. Cost for unranked topics (default: 100).
+#' @param max_solutions Integer. Limit of produced solutions when multiple are possible.
 #' @param debug Logical. If TRUE, prints diagnostic messages.
 #'
 #' @return A tibble with `student_id`, `topic1`, `topic2`, etc.
