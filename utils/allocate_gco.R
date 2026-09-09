@@ -42,6 +42,7 @@ allocate_gco <- function(
   topic_ids,
   n_topics_per_student = 2,
   penalty_value = 100,
+  max_solutions = 10,
   debug = TRUE
 ) {
   # --- 1. Validation ---
@@ -101,7 +102,7 @@ allocate_gco <- function(
   }
 
   # --- 5. Solve ---
-  solution <- lpSolve::lp(
+  sol <- lpSolve::lp(
     direction = "min",
     objective.in = cost_vec,
     const.mat = constraints$matrix,
@@ -110,25 +111,51 @@ allocate_gco <- function(
     all.bin = TRUE
   )
 
-  if (solution$status != 0) {
+  if (sol$status != 0) {
     cli::cli_abort(c(
       "Solver failed to find valid allocation",
-      "i" = "Status code: {solution$status}",
+      "i" = "Status code: {sol$status}",
       "i" = "This usually means constraints are infeasible"
     ))
   }
 
   if (debug) {
-    cli::cli_alert_success("Solution found (total cost: {solution$objval})")
+    cli::cli_alert_success("Solution found (total cost: {sol$objval})")
+  }
+  
+  # --- 6. Find multiple solutions ---
+  solution <- find_multiple_solutions(
+    sol = sol,
+    cost_vec = cost_vec,
+    all_constraints = constraints$matrix,
+    const_dirs = constraints$directions,
+    const_rhs = constraints$rhs,
+    solution_cap = max_solutions
+  )
+  
+  # Retrieve number of solutions
+  n_solutions <- nrow(solution)
+  if (n_solutions == 1) {
+    cli::cli_alert_info("Solution is unique")
+  }
+  else if (n_solutions < max_solutions) {
+    cli::cli_alert_info("Several solutions found: {n_solutions} solutions")
+  }
+  else if (n_solutions == max_solutions) {
+    cli::cli_alert_info("Several solutions found: {n_solutions} solutions. Further solutions may exist")
   }
 
-  # --- 6. Format Results ---
-  result <- format_ilp_results(
-    solution_vec = solution$solution,
-    student_ids = student_ids,
-    topic_ids = topic_ids,
-    n_students = n_students
-  )
+  # --- 7. Format Results ---
+  result <- lapply(seq_len(nrow(solution)), function(i) {
+    parse_solution(solution[i, ], n_students, topic_ids, student_ids)
+  })
+  
+  # Name solutions
+  names(result) <- paste0("solution_", seq_along(result))
+  
+  # If there is only one solution: Convert output list to tibble
+  if (length(result) == 1) {result <- result[[1]]}
+  
 
   result
 }
@@ -256,6 +283,94 @@ format_ilp_results <- function(
     dplyr::ungroup() |>
     tidyr::pivot_wider(names_from = col, values_from = topics)
 }
+
+#' Find multiple solutions
+#' @keywords internal
+find_multiple_solutions <- function(
+    sol,
+    cost_vec,
+    all_constraints,
+    const_dirs,
+    const_rhs,
+    solution_cap) {
+  
+  # Set solution counter
+  solution_counter <- 1
+  
+  # Define initial parameters
+  solution <- sol$solution
+  optimal_costs <- sol$objval
+  
+  # Iterate until all optimal solutions are found or solution cap is reached.
+  while (solution_counter < solution_cap) {
+    
+    # Integrate previous solution into constraints
+    cut_row <- sol$solution
+    all_constraints <- rbind(all_constraints, cut_row)
+    const_dirs <- c(const_dirs, "<=")
+    const_rhs <- c(const_rhs, length(which(cut_row == 1))-1)
+    
+    # Run solver
+    sol <- lpSolve::lp(
+      direction = "min",
+      objective.in = cost_vec,
+      const.mat = all_constraints,
+      const.dir = const_dirs,
+      const.rhs = const_rhs,
+      all.bin = TRUE
+    )
+    
+    # Stop if new solution is not optimal
+    if(sol$status != 0 | sol$objval > optimal_costs + 1e-6) {
+      break
+    }
+    
+    # Integrate new solution into solution matrix
+    solution <- rbind(solution, sol$solution)
+    solution_counter <- solution_counter + 1
+    
+  }
+  
+  # If solution unique, invert solution vector to matrix for the reshaping progress.
+  if(solution_counter == 1){
+    solution <- matrix(sol$solution, nrow = 1)
+  }
+  
+  solution
+}
+
+parse_solution <- function(solution_vector, n_students, topic_ids, student_ids) {
+  
+  # Reshape the binary solution vector back into a matrix
+  # Dimensions: Rows = Students, Cols = Topics
+  result_matrix <- matrix(solution_vector, nrow = n_students, byrow = TRUE)
+  colnames(result_matrix) <- topic_ids
+  rownames(result_matrix) <- student_ids
+  
+  # Convert binary matrix to the requested list format
+  # We iterate rows and pick column names where value is 1
+  output_list <- apply(
+    result_matrix,
+    1,
+    function(row) {
+      names(row)[row == 1]
+    },
+    simplify = FALSE
+  )
+  
+  # Convert list to wide tibble
+  tibble::enframe(
+    output_list,
+    name = "student_id",
+    value = "topic"
+  ) |>
+    tidyr::unnest(topic) |>
+    dplyr::group_by(student_id) |>
+    dplyr::mutate(col_name = paste0("topic", dplyr::row_number())) |>
+    dplyr::ungroup() |>
+    tidyr::pivot_wider(names_from = col_name, values_from = topic)
+}
+
 
 #' Reshape Allocation Data to Topic Perspective
 #'
