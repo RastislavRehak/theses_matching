@@ -68,6 +68,8 @@ load_student_preferences <- function(file_path, debug = TRUE) {
   }
 
   # 2. Read ragged CSV
+  n_max <- max(count.fields(file_path, sep = ","))
+  
   raw <- read.table(
     file_path,
     sep = ",",
@@ -76,7 +78,8 @@ load_student_preferences <- function(file_path, debug = TRUE) {
     na.strings = c("", "NA"),
     colClasses = "character",
     strip.white = TRUE,
-    stringsAsFactors = FALSE
+    stringsAsFactors = FALSE,
+    col.names = paste0("V", seq_len(n_max))
   )
 
   colnames(raw) <- c("student_id", paste0("pref", seq_len(ncol(raw) - 1)))
@@ -115,6 +118,8 @@ load_supervisor_preferences <- function(
   }
 
   # 2. Read ragged CSV
+  n_max <- max(count.fields(file_path, sep = ","))
+  
   raw <- read.table(
     file_path,
     sep = ",",
@@ -123,7 +128,8 @@ load_supervisor_preferences <- function(
     na.strings = c("", "NA"),
     colClasses = "character",
     strip.white = TRUE,
-    stringsAsFactors = FALSE
+    stringsAsFactors = FALSE,
+    col.names = paste0("V", seq_len(n_max))
   )
 
   # 3. Handle column naming
