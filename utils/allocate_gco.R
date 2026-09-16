@@ -354,12 +354,13 @@ format_solution <- function(solution_vector, n_students, topic_ids, student_ids)
 #' This is necessary if multiple solutions are possible and those solutions need to 
 #' be compared to find the most preferable solution out of the set of optimal solutions.
 #' 
-#' @param solution_list The list of solutions resulting from optimization.
+#' @param solution_list List of solutions resulting from optimization.
+#' @param student_prefs Tibble with `student_id` and preference columns (`pref1`, `pref2`, ...).
 #' @param path String. Path to the directory where the file should be saved.
 #' 
 #' @return An xlsx-file containing all found solutions and the student preferences. 
 export_multiple_solutions <- function(solution_list, 
-                           student_preferences,
+                           student_prefs,
                            path = here::here("output", "multiple_solutions.xlsx"),
                            gap = 1,
                            row_gap = 2) {
@@ -371,7 +372,7 @@ export_multiple_solutions <- function(solution_list,
       as.numeric
     ))
   }
-  student_preferences <- to_numeric(student_preferences)
+  student_prefs <- to_numeric(student_prefs)
   solution_list <- lapply(solution_list,to_numeric)
   
   # Create ouput folder if not existing
@@ -383,10 +384,10 @@ export_multiple_solutions <- function(solution_list,
   
   # Display student preferences on the top of the sheet
   openxlsx::writeData(wb, "Tibbles", "Student Preferences", startCol = 1, startRow = 1)
-  openxlsx::writeData(wb, "Tibbles", student_preferences, startCol = 1, startRow = 2)
+  openxlsx::writeData(wb, "Tibbles", student_prefs, startCol = 1, startRow = 2)
   
   # Set starting row for tibbles
-  start_row <- 2 + nrow(student_preferences) + 1 + row_gap
+  start_row <- 2 + nrow(student_prefs) + 1 + row_gap
   
   # Add tibble by tibble with 1 column gap
   start_col <- 1
