@@ -146,7 +146,7 @@ Place the following files in the `input/` folder (see examples in folder):
 
 #### Running
 
-Open `allocation_ba_round1.Rmd` and adjust `n_topics_per_student` if necessary (default: 2). Then run all chunks.
+Open `allocation_ba_round1.Rmd` and adjust `n_topics_per_student` if necessary (default: 2). Then run all chunks. If the algorithm finds multiple solutions, it exports them to an Excel sheet in the `output/` folder. Choose a solution by adjusting `pref_solution`.
 
 #### Output
 

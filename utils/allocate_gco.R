@@ -14,6 +14,8 @@
 #' @param topic_ids Character vector of valid topic IDs.
 #' @param n_topics_per_student Integer. Topics to assign each student (default: 2).
 #' @param penalty_value Integer. Cost for unranked topics (default: 100).
+#' @param multiple_solutions Logical. If TRUE, checks for multiple optimal solutions.
+#' @param max_solutions Integer. Limit of produced solutions when multiple are possible.
 #' @param debug Logical. If TRUE, prints diagnostic messages.
 #'
 #' @return A tibble with `student_id`, `topic1`, `topic2`, etc.
@@ -42,6 +44,8 @@ allocate_gco <- function(
   topic_ids,
   n_topics_per_student = 2,
   penalty_value = 100,
+  multiple_solutions = TRUE,
+  max_solutions = 10,
   debug = TRUE
 ) {
   # --- 1. Validation ---
@@ -101,7 +105,7 @@ allocate_gco <- function(
   }
 
   # --- 5. Solve ---
-  solution <- lpSolve::lp(
+  sol <- lpSolve::lp(
     direction = "min",
     objective.in = cost_vec,
     const.mat = constraints$matrix,
@@ -110,25 +114,56 @@ allocate_gco <- function(
     all.bin = TRUE
   )
 
-  if (solution$status != 0) {
+  if (sol$status != 0) {
     cli::cli_abort(c(
       "Solver failed to find valid allocation",
-      "i" = "Status code: {solution$status}",
+      "i" = "Status code: {sol$status}",
       "i" = "This usually means constraints are infeasible"
     ))
   }
 
   if (debug) {
-    cli::cli_alert_success("Solution found (total cost: {solution$objval})")
+    cli::cli_alert_success("Solution found (total cost: {sol$objval})")
+  }
+  
+  # --- 6. Find multiple solutions ---
+  if (multiple_solutions == TRUE) {
+    
+    solution <- find_multiple_solutions(
+      sol = sol,
+      cost_vec = cost_vec,
+      all_constraints = constraints$matrix,
+      const_dirs = constraints$directions,
+      const_rhs = constraints$rhs,
+      solution_cap = max_solutions
+    )
+  
+    # Retrieve number of solutions
+    if(debug) {
+      n_solutions <- nrow(solution)
+      if (n_solutions == 1) {
+        cli::cli_alert_info("Solution is unique")
+      }
+      else if (n_solutions < max_solutions) {
+        cli::cli_alert_info("Multiple solutions found: {n_solutions} solutions")
+      }
+      else if (n_solutions == max_solutions) {
+        cli::cli_alert_info("Multiple solutions found: {n_solutions} solutions created. Further solutions may exist")
+      }
+    }
   }
 
-  # --- 6. Format Results ---
-  result <- format_ilp_results(
-    solution_vec = solution$solution,
-    student_ids = student_ids,
-    topic_ids = topic_ids,
-    n_students = n_students
-  )
+  # --- 7. Format Results ---
+  result <- lapply(seq_len(nrow(solution)), function(i) {
+    format_solution(solution[i, ], n_students, topic_ids, student_ids)
+  })
+  
+  # Name solutions
+  names(result) <- paste0("solution_", seq_along(result))
+  
+  # If there is only one solution: Convert output list to tibble
+  if (length(result) == 1) {result <- result[[1]]}
+  
 
   result
 }
@@ -222,24 +257,75 @@ build_ilp_constraints <- function(
 }
 
 
-#' Format ILP Solution into Tibble
+#' Find multiple solutions
 #' @keywords internal
-format_ilp_results <- function(
-  solution_vec,
-  student_ids,
-  topic_ids,
-  n_students
-) {
-  # Reshape binary vector to matrix
-  result_matrix <- matrix(
-    solution_vec,
-    nrow = n_students,
-    byrow = TRUE,
-    dimnames = list(student_ids, topic_ids)
-  )
+find_multiple_solutions <- function(
+    sol,
+    cost_vec,
+    all_constraints,
+    const_dirs,
+    const_rhs,
+    solution_cap) {
+  
+  # Set solution counter
+  solution_counter <- 1
+  
+  # Define initial parameters
+  solution <- sol$solution
+  optimal_costs <- sol$objval
+  
+  # Iterate until all optimal solutions are found or solution cap is reached.
+  while (solution_counter < solution_cap) {
+    
+    # Integrate previous solution into constraints
+    cut_row <- sol$solution
+    all_constraints <- rbind(all_constraints, cut_row)
+    const_dirs <- c(const_dirs, "<=")
+    const_rhs <- c(const_rhs, length(which(cut_row == 1))-1)
+    
+    # Run solver
+    sol <- lpSolve::lp(
+      direction = "min",
+      objective.in = cost_vec,
+      const.mat = all_constraints,
+      const.dir = const_dirs,
+      const.rhs = const_rhs,
+      all.bin = TRUE
+    )
+    
+    # Stop if new solution is not optimal
+    if(sol$status != 0 | sol$objval > optimal_costs + 1e-6) {
+      break
+    }
+    
+    # Integrate new solution into solution matrix
+    solution <- rbind(solution, sol$solution)
+    solution_counter <- solution_counter + 1
+    
+  }
+  
+  # If solution unique, invert solution vector to matrix for the reshaping progress.
+  if(solution_counter == 1){
+    solution <- matrix(sol$solution, nrow = 1)
+  }
+  
+  solution
+}
 
-  # Extract assigned topics for each student
-  assignments <- apply(
+
+#' Format ILP Solutions into Tibbles
+#' @keywords internal
+format_solution <- function(solution_vector, n_students, topic_ids, student_ids) {
+  
+  # Reshape the binary solution vector back into a matrix
+  # Dimensions: Rows = Students, Cols = Topics
+  result_matrix <- matrix(solution_vector, nrow = n_students, byrow = TRUE)
+  colnames(result_matrix) <- topic_ids
+  rownames(result_matrix) <- student_ids
+  
+  # Convert binary matrix to the requested list format
+  # We iterate rows and pick column names where value is 1
+  output_list <- apply(
     result_matrix,
     1,
     function(row) {
@@ -247,15 +333,80 @@ format_ilp_results <- function(
     },
     simplify = FALSE
   )
-
-  # Convert to wide tibble
-  tibble::enframe(assignments, name = "student_id", value = "topics") |>
-    tidyr::unnest(topics) |>
+  
+  # Convert list to wide tibble
+  tibble::enframe(
+    output_list,
+    name = "student_id",
+    value = "topic"
+  ) |>
+    tidyr::unnest(topic) |>
     dplyr::group_by(student_id) |>
-    dplyr::mutate(col = paste0("topic", dplyr::row_number())) |>
+    dplyr::mutate(col_name = paste0("topic", dplyr::row_number())) |>
     dplyr::ungroup() |>
-    tidyr::pivot_wider(names_from = col, values_from = topics)
+    tidyr::pivot_wider(names_from = col_name, values_from = topic)
 }
+
+
+#' Convert list of tibbles into xlsx
+#' 
+#' This function converts the output from the matching algorithm into an Excel-Sheet.
+#' This is necessary if multiple solutions are possible and those solutions need to 
+#' be compared to find the most preferable solution out of the set of optimal solutions.
+#' 
+#' @param solution_list List of solutions resulting from optimization.
+#' @param student_prefs Tibble with `student_id` and preference columns (`pref1`, `pref2`, ...).
+#' @param path String. Path to the directory where the file should be saved.
+#' 
+#' @return An xlsx-file containing all found solutions and the student preferences. 
+export_multiple_solutions <- function(solution_list, 
+                           student_prefs,
+                           path = here::here("output", "multiple_solutions.xlsx"),
+                           gap = 1,
+                           row_gap = 2) {
+  
+  # Convert characters to numeric
+  to_numeric <- function(df) {
+    dplyr::mutate(df, dplyr::across(
+      where(is.character) & where(~ all(!is.na(suppressWarnings(as.numeric(.))) | is.na(.))),
+      as.numeric
+    ))
+  }
+  student_prefs <- to_numeric(student_prefs)
+  solution_list <- lapply(solution_list,to_numeric)
+  
+  # Create ouput folder if not existing
+  dir.create(here::here("output"), showWarnings = FALSE)
+  
+  # Create workbook and worksheet
+  wb <- openxlsx::createWorkbook()
+  openxlsx::addWorksheet(wb, "Tibbles")
+  
+  # Display student preferences on the top of the sheet
+  openxlsx::writeData(wb, "Tibbles", "Student Preferences", startCol = 1, startRow = 1)
+  openxlsx::writeData(wb, "Tibbles", student_prefs, startCol = 1, startRow = 2)
+  
+  # Set starting row for tibbles
+  start_row <- 2 + nrow(student_prefs) + 1 + row_gap
+  
+  # Add tibble by tibble with 1 column gap
+  start_col <- 1
+  sol_names <- names(solution_list)
+  
+  for (i in seq_along(solution_list)) {
+    tbl <- solution_list[[i]]
+    
+    openxlsx::writeData(wb, "Tibbles", sol_names[i], startCol = start_col, startRow = start_row)
+    openxlsx::writeData(wb, "Tibbles", tbl, startCol = start_col, startRow = start_row + 1)
+    start_col <- start_col + ncol(tbl) + gap
+  }
+  
+  # Save to defined path
+  openxlsx::saveWorkbook(wb, path, overwrite = TRUE)
+  invisible(path)
+}
+
+
 
 #' Reshape Allocation Data to Topic Perspective
 #'
