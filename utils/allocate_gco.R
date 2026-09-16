@@ -14,6 +14,7 @@
 #' @param topic_ids Character vector of valid topic IDs.
 #' @param n_topics_per_student Integer. Topics to assign each student (default: 2).
 #' @param penalty_value Integer. Cost for unranked topics (default: 100).
+#' @param multiple_solutions Logical. If TRUE, checks for multiple optimal solutions.
 #' @param max_solutions Integer. Limit of produced solutions when multiple are possible.
 #' @param debug Logical. If TRUE, prints diagnostic messages.
 #'
@@ -43,6 +44,7 @@ allocate_gco <- function(
   topic_ids,
   n_topics_per_student = 2,
   penalty_value = 100,
+  multiple_solutions = TRUE,
   max_solutions = 10,
   debug = TRUE
 ) {
@@ -125,26 +127,29 @@ allocate_gco <- function(
   }
   
   # --- 6. Find multiple solutions ---
-  solution <- find_multiple_solutions(
-    sol = sol,
-    cost_vec = cost_vec,
-    all_constraints = constraints$matrix,
-    const_dirs = constraints$directions,
-    const_rhs = constraints$rhs,
-    solution_cap = max_solutions
-  )
+  if (multiple_solutions == TRUE) {
+    
+    solution <- find_multiple_solutions(
+      sol = sol,
+      cost_vec = cost_vec,
+      all_constraints = constraints$matrix,
+      const_dirs = constraints$directions,
+      const_rhs = constraints$rhs,
+      solution_cap = max_solutions
+    )
   
-  # Retrieve number of solutions
-  if(debug) {
-    n_solutions <- nrow(solution)
-    if (n_solutions == 1) {
-      cli::cli_alert_info("Solution is unique")
-    }
-    else if (n_solutions < max_solutions) {
-      cli::cli_alert_info("Multiple solutions found: {n_solutions} solutions")
-    }
-    else if (n_solutions == max_solutions) {
-      cli::cli_alert_info("Multiple solutions found: {n_solutions} solutions created. Further solutions may exist")
+    # Retrieve number of solutions
+    if(debug) {
+      n_solutions <- nrow(solution)
+      if (n_solutions == 1) {
+        cli::cli_alert_info("Solution is unique")
+      }
+      else if (n_solutions < max_solutions) {
+        cli::cli_alert_info("Multiple solutions found: {n_solutions} solutions")
+      }
+      else if (n_solutions == max_solutions) {
+        cli::cli_alert_info("Multiple solutions found: {n_solutions} solutions created. Further solutions may exist")
+      }
     }
   }
 
