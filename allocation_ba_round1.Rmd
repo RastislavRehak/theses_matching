@@ -21,7 +21,7 @@ topics_ba_path <- "input/topics_ba.txt"
 
 ## Output Paths
 allocations_ba_round1_students_path <- "output/allocations_ba_round1_students.csv"
-allocations_ba_round1_supervisors_path <- "output/allocations_ba_round1_topics.csv"
+allocations_ba_round1_topics_path <- "output/allocations_ba_round1_topics.csv"
 ```
 
 # Safely load data
@@ -86,14 +86,14 @@ print(allocations_ba_round1_students)
 
 ```{r}
 # pivot to topic perspective
-allocations_ba_round1_supervisors <- pivot_to_topic_perspective(allocations_ba_round1_students)
+allocations_ba_round1_topics <- pivot_to_topic_perspective(allocations_ba_round1_students)
 
-print(allocations_ba_round1_supervisors)
+print(allocations_ba_round1_topics)
 ```
 
 # Write output to file
 
 ```{r}
 write_csv(allocations_ba_round1_students, allocations_ba_round1_students_path)
-write_csv(allocations_ba_round1_supervisors, allocations_ba_round1_supervisors_path)
+write_csv(allocations_ba_round1_topics, allocations_ba_round1_topics_path)
 ```
