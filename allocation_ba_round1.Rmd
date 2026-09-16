@@ -61,10 +61,10 @@ print(allocations_ba_round1_students)
 ```
 
 ```{r}
-# If necessary, find most suitable optimal solution
+# In case of multiple solutions, export solutions to find most preferable solution manually
 if(is.list(allocations_ba_round1_students) && !is.data.frame(allocations_ba_round1_students)) {
   
-  # Export list of solutions to an Excel-Sheet
+  # Export list of solutions to an Excel sheet
   export_multiple_solutions(
     allocations_ba_round1_students, 
     student_preferences_ba_round1
@@ -75,13 +75,13 @@ if(is.list(allocations_ba_round1_students) && !is.data.frame(allocations_ba_roun
 ```{r}
 if(is.list(allocations_ba_round1_students) && !is.data.frame(allocations_ba_round1_students)) {
   
-  # Choose most feasible solution (solution_x: pref_solution <- x)
+  # Choose preferred solution (solution_x: pref_solution <- x)
   pref_solution <- 1
 
   allocations_ba_round1_students <- allocations_ba_round1_students[[pref_solution]]
-
-  print(allocations_ba_round1_students)
 }
+
+print(allocations_ba_round1_students)
 ```
 
 ```{r}
