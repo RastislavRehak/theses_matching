@@ -1,0 +1,4 @@
+Anna, 3, 1
+Berta, 3, 1
+Caro, 3, 1
+Dennis, 3, 1

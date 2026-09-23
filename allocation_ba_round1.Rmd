@@ -1,0 +1,99 @@
+```{r Setup}
+# load libraries
+library(tidyverse)
+library(here)
+
+# set base folder
+here::i_am("allocation_ba_round1.Rmd")
+
+# Import utils and config
+purrr::walk(
+  list.files(here::here("utils"), pattern = "\\.R$", full.names = TRUE),
+  source
+)
+
+# Config
+n_topics_per_student <- 2 # the number of students that shall be assigned to each topic. Leave NULL for automatic calculation that ensures every student gets at least one topic.
+
+## Input Paths
+student_preferences_ba_round1_path <- "input/student_preferences_ba_round1.txt"
+topics_ba_path <- "input/topics_ba.txt"
+
+## Output Paths
+allocations_ba_round1_students_path <- "output/allocations_ba_round1_students.csv"
+allocations_ba_round1_topics_path <- "output/allocations_ba_round1_topics.csv"
+```
+
+# Safely load data
+
+```{r}
+# Supervisors/Topics
+topics_ba <- load_topics(topics_ba_path)
+
+print(topics_ba)
+```
+
+```{r}
+# Student preferences
+student_preferences_ba_round1 <- load_student_preferences(student_preferences_ba_round1_path)
+
+print(student_preferences_ba_round1)
+```
+
+# Check Data Validity
+
+```{r}
+# Cross validate Student and Supervisor Preferences
+crossvalidate_preferences(student_preferences_ba_round1, topics_ba |> rename(supervisor_id = topic_id))
+```
+
+# Allocate Students using Global Cost Optimization
+
+```{r}
+# allocate and output student perspective
+allocations_ba_round1_students <- allocate_gco(
+  student_prefs = student_preferences_ba_round1,
+  topic_ids = topics_ba$topic_id,
+  n_topics_per_student = n_topics_per_student
+  )
+
+print(allocations_ba_round1_students)
+```
+
+```{r}
+# In case of multiple solutions, export solutions to find most preferable solution manually
+if(is.list(allocations_ba_round1_students) && !is.data.frame(allocations_ba_round1_students)) {
+  
+  # Export list of solutions to an Excel sheet
+  export_multiple_solutions(
+    allocations_ba_round1_students, 
+    student_preferences_ba_round1
+  )
+}
+```
+
+```{r}
+if(is.list(allocations_ba_round1_students) && !is.data.frame(allocations_ba_round1_students)) {
+  
+  # Choose preferred solution (solution_x: pref_solution <- x)
+  pref_solution <- 1
+
+  allocations_ba_round1_students <- allocations_ba_round1_students[[pref_solution]]
+}
+
+print(allocations_ba_round1_students)
+```
+
+```{r}
+# pivot to topic perspective
+allocations_ba_round1_topics <- pivot_to_topic_perspective(allocations_ba_round1_students)
+
+print(allocations_ba_round1_topics)
+```
+
+# Write output to file
+
+```{r}
+write_csv(allocations_ba_round1_students, allocations_ba_round1_students_path)
+write_csv(allocations_ba_round1_topics, allocations_ba_round1_topics_path)
+```
