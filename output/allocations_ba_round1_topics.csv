@@ -1,5 +1,6 @@
 topic_id,n_students,students
-1,3,"John Smith, Darth Vader, Donald"
-2,3,"Jane Doe, Arnold, Joones"
-3,4,"John Smith, Donald, Mike, Joones"
-4,4,"Jane Doe, Darth Vader, Arnold, Mike"
+1,3,"Berta, Daniel, Gerda"
+2,3,"Caro, Eugen, Gerda"
+3,4,"Anna, Caro, Frank, Hase"
+4,3,"Anna, Daniel, Hase"
+5,3,"Berta, Eugen, Frank"

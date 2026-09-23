@@ -1,5 +1,0 @@
-Jane Doe, 4, 2
-John Smith, 1, 3
-Darth Vader, 1
-Arnold, 4
-Marios, 1, 2, 3, 4

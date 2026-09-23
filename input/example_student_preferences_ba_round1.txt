@@ -1,7 +1,0 @@
-Jane Doe, 4, 2
-John Smith, 3
-Darth Vader, 1, 2, 4
-Arnold, 2, 4, 3
-Donald, 3
-Mike, 4, 3, 2
-Joones, 2, 3

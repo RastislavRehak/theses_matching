@@ -1,5 +1,0 @@
-1, Ben Schmidt, Clara Weber, Jonas Klein, Felix Becker
-2, Clara Weber, Greta Hoffmann, Laura Richter, Hannah Schulz
-3, Eva Wagner, David Fischer, Hannah Schulz, Greta Hoffmann
-4, Ben Schmidt, Eva Wagner, Jonas Klein, Anna Müller
-5, Felix Becker, David Fischer, Laura Richter, Anna Müller 
