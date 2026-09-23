@@ -357,11 +357,13 @@ format_solution <- function(solution_vector, n_students, topic_ids, student_ids)
 #' @param solution_list List of solutions resulting from optimization.
 #' @param student_prefs Tibble with `student_id` and preference columns (`pref1`, `pref2`, ...).
 #' @param path String. Path to the directory where the file should be saved.
+#' @param gap Integer. Number of empty columns between solution tibbles.
+#' @param row_gap Integer. Number of empty rows between student preferences and solution tibbles.
 #' 
 #' @return An xlsx-file containing all found solutions and the student preferences. 
 export_multiple_solutions <- function(solution_list, 
                            student_prefs,
-                           path = here::here("output", "multiple_solutions.xlsx"),
+                           path = here::here("output", "ba_round1_multiple_solutions.xlsx"),
                            gap = 1,
                            row_gap = 2) {
   
