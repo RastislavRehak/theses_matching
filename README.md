@@ -175,17 +175,3 @@ Open `allocation_ma.Rmd` and run all chunks.
 |----------------------|---------------------------------------------|
 | `allocations_ma.csv` | One row per matched student-supervisor pair |
 | `unassigned_ma.csv`  | Unmatched students and supervisors          |
-
-------------------------------------------------------------------------
-
-## ToDo
-
--   [x] Talk to Rasto if the currently implemented RSD and DA logics are as intended
--   [x] Refactor everything
--   [x] Make README really helpful
--   [x] Refactor examples
--   [x] Add algorithm choice considerations to README
--   [x] Add MA thesis allocation
--   [ ] Test with real and simulated data
--   [ ] merge with main
--   [ ] Do an audit by a second person
